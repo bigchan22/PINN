@@ -1,0 +1,1585 @@
+\documentclass[11pt,reqno]{article}
+\usepackage{amssymb, amsmath, amsthm}
+\usepackage{color}  
+\usepackage{wrapfig}
+
+\usepackage{kotex}
+
+\numberwithin{equation}{section}
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{prob}[thm]{Problem}
+\newtheorem{prop}[thm]{Proposition}
+
+\newtheorem{defin}[thm]{Definition}
+\newtheorem{rem}[thm]{Remark}
+\newtheorem{exa}[thm]{Example}
+
+% \usepackage{PRIMEarxiv}
+
+% \usepackage[utf8]{inputenc} % allow utf-8 input
+% \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+% \usepackage{url}            % simple URL typesetting
+% \usepackage{booktabs}       % professional-quality tables
+% \usepackage{amsfonts}       % blackboard math symbols
+% \usepackage{nicefrac}       % compact symbols for 1/2, etc.
+% \usepackage{microtype}      % microtypography
+% \usepackage{fancyhdr}       % header
+\usepackage{graphicx}       % graphics
+% \usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algorithmicx, algpseudocode}
+% \usepackage[normalem]{ulem}
+%\useunder{\uline}{\ul}{}
+% \graphicspath{{media/}}     % organize your images and other figures under media/ folder
+% \DeclareMathOperator*{\argmin}{argmin}
+\usepackage{subfigure}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{caption} %, subcaption}
+% \usepackage{showkeys}
+%\usepackage{refcheck}
+
+%Header
+% \pagestyle{fancy}
+% \thispagestyle{empty}
+% \rhead{ \textit{ }} 
+
+% Update your Headers here
+% \fancyhead[LO]{Option price and volatility via PINN}
+% \fancyhead[RE]{Firstauthor and Secondauthor} % Firstauthor et al. if more than 2 - must use \documentclass[twoside]{article}
+
+%% Title
+\title{Option pricing and volatility surface based on physics-informed neural network}
+
+\author{
+  Hyeong-Ohk Bae \\
+  Dept of Financial engineering \\
+  Ajou University \\
+  Republic of Korea\\
+  \texttt{hobae@ajou.ac.kr} \\
+  \and
+  Seunggu Kang \\
+  Dept of Financial engineering \\
+  Ajou University \\
+  Republic of Korea\\
+  \texttt{crator777@ajou.ac.kr} \\
+  \and
+  Muhyun Lee \\
+  %Dept of Financial engineering \\ Ajou University \\ \texttt{hyunw337@ajou.ac.kr} \\
+  Samsung Securities\\
+  11 Seocho-daero 74-gil, Seocho-gu, Seoul\\
+  \texttt{moo.lee@samsung.com}
+%  \and
+%  Sangyun Nam \\
+%  Dept of Financial engineering \\
+%  Ajou University \\
+%  \texttt{tkddbs6441@ajou.ac.kr}
+}
+%\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We solve the Black-Scholes equation and constant elasticity of variance model
+for European options
+under the local volatility model
+ by an artificial neural network, and calculate the price and the Greeks simultaneously.
+ %Dupire’s local volatility model is one of the most successful for equity models.
+ %In practice, it is important to price and hedge derivatives under the local volatility model.
+ %We provide an artificial neural network scheme for efficiently parametric PDEs solver.
+
+%We adopt local volatility models, especially, constant elasticity of variance(CEV) model and volatility surface.
+% The price function of European options under the local volatility model satisfies Dupire's equation.
+% We solve the parametric PDE of the European put option under the local volatility model
+% with an artificial neural network and show that solution and Dupire's equation are approximated.
+
+We also apply physics-informed neural network to the multidimensional Black-scholes equation
+ and calculate the price of a step-down ELS which has two underlying assets.
+  Then we compare the prices and Greeks by PINN and by OSM.
+\end{abstract}
+%\keywords{Keyword1 \and Keyword2 \and Keyword3 \and Keyword4 \and Keyword5}
+\noindent\textbf{Keywords}: Option pricing, Local volatility, Neural Network,
+Black-Scholes equation (BSE), Dupire's equation, Physics-informed neural network (PINN)
+
+% keywords can be removed
+% \keywords{Keyword1 \and Keyword2 \and Keyword3 \and Keyword4 \and Keyword5}
+
+%\tableofcontents
+\section{Introduction}
+
+The Black-Scholes partial differential equation (BSE) \cite{Black-Scholes-Merton} is the most widely used option pricing model.
+ The assumption that the price of the underlying asset follows a log-normal process
+  with a constant volatility, is useful for practitioners because there is closed-form solutions
+   for the European options.
+  However, the constant volatility assumption is not realistic in the real world.
+   Dupire’s local volatility model is most useful in practice and 
+   it is important to calculate rices and Greeks under the local volatility. 
+
+In practice, estimating the volatility surface is important for pricing exotic options or hedging derivatives.
+ Since different implied volatilities are observed depending on maturity and strike price in the market,
+after works by  \cite{Derman-Kani-1994, Dupire-1994} 
+ many studies have been conducted to estimate the volatility surface via the local volatility model
+ (\cite{ carr2009, coleman2001, gatheral2011, LARGUINHO2013, ART002537016}).
+In \cite{ART002181552}, by using the parameters obtained by calibration 
+and the implied volatility formula under SABR model, 
+the authors provide several quantitative properties of volatility by drawing volatility surface. 
+
+A local volatility model %with a volatility surface
+ does not have a closed form solution.
+As numerical methods, the Monte-Carlo method and the finite difference method (FDM)
+ are most popular for option pricing.
+ However, they have some disadvantages.
+Typically, price and Greeks cannot be obtained at the same time.
+In \cite{kim2014option}, the mesh-free point collocation method %developed in \cite{kim2003point}
+   is used to calculate option price and their Greeks simultaneously.
+ Neural networks can be used in a sense similar to the mesh-free methods,
+ which compute price and Greeks simultaneously.
+ It also solves parametric partial differential equations (PDEs),
+ and approximates even the derivatives with respect to the parameter
+  (see Section \ref{sec:Mu_nu1} and \cite{muhyun2022}).
+
+Research on solving PDE using artificial neural networks has been in progress for several decades
+ \cite{lee1990neural, lagaris1998artificial, meade1994solution, yentis1996vlsi},
+  and many studies \cite{sirignano2018dgm, raissi2019physics, glau2022deep, berner2020numerically} have shown the deep learning as an interesting tool.
+  In \cite{raissi2019physics},
+   a deep learning framework for solving nonlinear PDEs is proposed, called 
+   the physics informed neural network (PINN).
+   Owing to the fact that a physical modeling is given in advance instead of providing data,
+  it is different from usual machine learning algorithms treated as black box tools.
+In a usual deep learning, the automatic differentiation technique is used to only the back propagation process. 
+Differently from a usual deep learning, PINN uses automatic differentiation to calculate derivatives included in a PDE where a physical information is described. 
+
+In this article, using PINN as a neural network approach, 
+we calculate solutions of single and multi-dimensional BSEs, Constant Elasticity of Variance (CEV),
+Dupire's PDE, related volatilities and prices for European options.
+%
+% ELS
+We also calculate price and Greeks of exotic options.
+ Then we compare  prices and Greeks calculated by PINN and by Operator splitting method (OSM).
+ 
+ As an exotic option and one of the flag ship products of the investment bank in Korea, Equity Linked Security (ELS) is a security whose returns on investment are tied to the returns of individual stocks or equity indices. There are different types of ELS depending on the payoff structures. Among them, step-down ELS is a representative product.
+%
+
+The contribution of this article is fourfold.
+\begin{enumerate}\vspace{-2mm}
+	\item
+We adopt a neural network algorithm to solve a family of extended BSEs, for example, CEV and Dupire’s local volatility model. Particularly, after training the network in the offline phase, the network estimates solutions for different parameter values in milliseconds.
+	\item \vspace{-2mm}
+We construct a local volatility surface and then, as an application, we show the practical usage of the method.
+	\item \vspace{-2mm}
+To evaluate the performance of the method, we study the errors in the option price and in Dupire’s equation for local volatility models.
+	\item\vspace{-2mm}
+We apply PINN to the multi-dimensional BSE and calculate the price and Greeks of a two-asset step-down ELS.
+ Then we compare the  prices and Greeks by PINN and by OSM.
+\end{enumerate}
+%
+This article is based on master dessertations \cite{kang2023, muhyun2022}.
+
+%In Section 2, we introduce local volatility models. We specify the local volatility models which has a closed solution for evaluating the performance of the model. In Section 3, we provide a detail explanation regarding the implementation of algorithm, and related works about solving PDE via neural networks. In Section 4, numerical results of local volatility models is presented. Conclusions are in Section 5.
+
+\section{Solving Black-Scholes PDE with Local Volatility via Physics-Informed Neural Network}
+\label{sec:headings}
+% 로컬볼 모델 설명
+\subsection{Local Volatility model}
+A well-known limitation of the Black-Scholes model is the assumption of a constant volatility. However, the implied volatilities in the market depend on the strike price and time to maturity. Implied volatility tends to be higher in deep Out of The Money(OTM) options and deep In The Money(ITM) options than At The Money(ATM) options. It is explained by a phenomenon called volatility smile (or skew)
+ (refer to \cite{Dupire-1994, Derman-Kani-1994}).
+%  Considering this, studies are conducted to expand the assumption.
+   In the local volatility model, in a risk-neutral world, the volatility is assumed as a deterministic function of time and stock price in the spreading period of the stock price process as follows:
+\begin{equation}\label{eqn:1}
+    dS_t = rS_tdt + \sigma(S_t,t)S_tdW_t,
+\end{equation}
+where $S_t$ is a stock price at time $t$, $r$ is a constant risk-free rate, and $dW_t$ is the standard Wiener process in the risk-neutral world. 
+The local volatility $\sigma(S_t,t)$ is a function of the underlying asset price $S_t$ 
+and the time $t$.
+In \cite{cox1976valuation} denoted by $V(S_t,t)$
+ a price function of a derivative with underlying asset $S_t$.
+ The extended BSE under the no arbitrage condition is as follows:
+\begin{equation*}%\label{eqn:2}
+    \frac{\partial V}{\partial t} + \frac{1}{2} \sigma^2(S_t,t) S_t^2 \frac{\partial^2 V}{\partial S_t^2} + rS_t\frac{\partial V}{\partial S_t} - rV = 0.
+\end{equation*} 
+
+Assuming that the price of the underlying asset follows \eqref{eqn:1}, the price of a European call option is given by 
+$%\begin{equation*}%\label{eqn:3}
+    c(S_0,K,T) = e^{-rT}\mathbb{E}[(S_T-K)^+],
+$ %\end{equation*}
+where $K$ is the strike price of the option, $T$ is the maturity and $\mathbb{E}$ is the expectation.
+In \cite{Dupire-1994}, a volatility function is obtained by solving the following PDE:
+\begin{equation}\label{eqn:4}
+    \sigma^2(K,T) =
+    2\frac{
+    \frac{\partial c}{\partial T} + rK\frac{\partial c}{\partial K}    }
+    { K^2\frac{\partial^2 c}{\partial K^2}     }
+    =
+    2\frac{
+    \frac{\partial p}{\partial T} + rK\frac{\partial p}{\partial K}    }
+    {    K^2\frac{\partial^2 p}{\partial K^2}    },
+\end{equation}
+where $p$ is the correspoding put option.
+% There is a specific case for the local volatility model which can be expressed in a closed-form of European vanilla option.
+If the local volatility is constant with respect to price and time, then \eqref{eqn:1} is reduced to the geometric Brownian motion (or called the Black-Scholes model in practice). A model leading to the skew of implied volatility is the CEV model \cite{cox1976valuation, cox1975notes}.
+
+% GBM 설명
+\subsubsection{Geometric Brownian Motion}
+% The geometric Brownian motion (GBM) is presented under the assumption with a constant volatility. 
+The geometric Brownian motion (GBM) follows log-normal, and has the advantage that the existence of closed-form solutions for various options is well known.
+ It can be seen as the simplest model of the local volatility model as flat surface.
+ The stochastic differential equation for GBM is the following:
+\begin{equation}\label{eqn:5}
+    dS_t = rS_tdt + \sigma S_tdW_t,
+\end{equation}
+where $\sigma$ is a constant.
+ The solutions for European options are known as the Black-Scholes formula:
+\begin{align*}%\label{eqn:7}
+    c(S_t,t,K,r,\sigma) &= S_tN(d_1) - Ke^{-r(T-t)}N(d_2),\cr
+%\label{eqn:8}
+    p(S_t,t,K,r,\sigma) &= Ke^{-r(T-t)}N(-d_1) - S_tN(-d_2),
+\end{align*}
+where $d_1:=\frac{\log(S_t/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$,
+$d_2:=d_1-\sigma\sqrt{T-t}$ and $N(x)$ is the cumulative normal distribution.
+The advantage of a model with a closed solution is that Greeks can be found analytically. 
+{Greeks' analytic formula are used for model evaluation.}
+For Greeks, we refer to \cite{LARGUINHO2013}
+ which contains many formula.
+
+% CEV모델 설명
+\subsubsection{Constant Elasticity of Variance model}
+The constant elasticity of variance (CEV) model  \cite{cox1975notes}
+ with the local volatility $\sigma(S_t,t)=\sigma S_t^{(\beta/2)-1}$
+  with $\beta\in \mathbb R$, explains the negative skew on the underlying asset's price,
+   and there are closed-form solutions for European vanilla options. 
+  CEV model is the same as that of GBM when $\beta=2$,
+   and the square-root diffusion model {in \cite{cox1976valuation} when $\beta=1$.
+    In \cite{emanuel1982further} the closed-form solution
+    is provided for European call option of $\beta>2$.
+Equations for CEV model are as follows: 
+\begin{align}\label{eqn:14}
+&   dS_t = rS_tdt + \sigma S_t^{\beta/2}dW_t, \\ %\label{eqn:15}
+\notag
+& \frac{\partial V}{\partial t} + \frac{1}{2} \sigma^2S_t^\beta \frac{\partial^2 V}{\partial S_t^2}
+ + rS_t\frac{\partial V}{\partial S_t} - rV = 0,
+\end{align}
+where $\sigma$ is a constant.
+The closed form solution for European put option $ p(S_t,t,K,r,\sigma) $ is
+\begin{align}
+\label{eqn:17:19}
+& p(S_t,t,K,r,\sigma) \\
+= \notag
+& \begin{cases}
+    Ke^{-r(T-t)}Q(2x;\frac{2}{2-\beta},2y)
+    -S_t\big[1{-}Q(2y;2 + \frac{2}{2-\beta},2x)\big],
+& \text{for } \beta<2,
+\\
+%\label{eqn:19}
+    Ke^{-r(T-t)}Q(2y;2 + \frac{2}{\beta-2},2x)
+    -S_t\big[1{-}Q(2x;\frac{2}{\beta-2},2y)\big],
+& \text{for } \beta>2,
+\end{cases}
+\end{align}
+where $Q(w;v,\lambda)$ is the complementary distribution function of a non-central chi-square law,
+ $v$ is the degree of freedom, $\lambda$ is a non-centrality parameter, 
+ $x = S_t^{2-\beta}e^{r(2-\beta)(T-t)}d$, $y = K^{2-\beta}d$,
+$d = 2r/ \big\{\delta^2(2-\beta)[e^{r(2-\beta)(T-t)}-1]\big\}$,
+ and $\delta^2 = \sigma_0^2S_0^{2-\beta}$.
+These values are given in \cite{lagaris1998artificial}.
+
+\subsection{Neural Network for PDE solver}
+
+Artificial neural networks are essentially functions that map from input variables to output values.
+ The layers in the neural network consist of composite functions of affine mapping (weighted sum)
+  and nonlinear mapping (activation function) functions.
+The universal approximation theorem has been demonstrated in \cite{cybenko1989approximation}
+ that a neural network with one hidden layer can approximate an arbitrary continuous function.
+  This shows the neural network is a kind of function approximation, and as a result,
+   it can be used as a method to solve PDE. Recently, neural network techniques to solve PDEs has been developed actively.
+    The automatic differentiation technique, which contributes greatly to the efficient learning of network weights and biases, provides partial derivatives of the neural network analytically. Therefore, this plays an important role in constructing a PDE for an objective function.
+
+\subsubsection{Neural Network for Local Volatility Black-Scholes Equation}
+Consider parametric BSE for $ V(\tau,s,k)$ under the local volatility model:
+
+\begin{equation*}%\label{eqn:30}
+\begin{aligned}
+    &\frac{\partial V}{\partial \tau}
+    - \frac{1}{2}\sigma^2(\tau,s)s^2\frac{\partial^2 V}{\partial s^2}
+    - rs\frac{\partial V}{\partial s}
+    + rV = 0, \\
+&\hspace{40mm}   \text{ for }
+    (\tau,s,k) \in [0,T] \times \Omega_S \times \Omega_K, \\
+    &V(0,s,k) = V_0(s,k), \qquad (s,k) \in \Omega_S \times \Omega_K, \\
+    &V(\tau,s,k) = g(\tau,s,k), \qquad (\tau,s,k) \in [0,T] \times \partial\Omega_S \times \Omega_K, 
+\end{aligned}
+\end{equation*}
+where $\tau=T-t$ is the time to maturity,
+$\Omega_S,\Omega_K \subset [0,\infty)$
+are closed sets of stock price $S$ and strike price $K$, respectively,
+ $\partial \Omega_S$ is the boundary of $\Omega_S$,
+  $V_0, g$ are given initial and boundary conditions.
+  
+ We denote by $u^\theta (\tau,s,k) \in \mathbb{R}^1$ a functional form of artificial neural network
+  for option price with respect to $\tau$, stock price $s$, and strike price $k$.
+Artificial neural network $u^\theta (\tau,s,k)$ approximates $V(\tau,s,k)$,
+ where $\theta$ is the neural network’s parameter.
+%Using by automatic-differentiation,
+%the differential operators of neural network can be calculated analytically. 
+
+Construct the objective function for BSE under the local volatility model
+as a summatin of mean square error losses for the equation, initial and boundary conditions:
+\begin{equation}\label{eqn:31}
+\begin{aligned}
+    &\mathcal{L}_{eq}(u^\theta) :=
+    \Big\lVert
+    \frac{\partial u^\theta}{\partial \tau}
+    - \frac{1}{2}\sigma^2(\tau,s)s^2\frac{\partial^2 u^\theta}{\partial s^2}
+    - rs\frac{\partial u^\theta}{\partial s}
+    + ru^\theta    \Big\rVert^2,\\
+%&\hspace{50mm} \text{for }   (\tau,s,k) \in [0,T] \times \Omega_S \times \Omega_K,\\
+    &\mathcal{L}_{ic}(u^\theta) := 
+    \lVert
+    u^\theta(0,s,k) - V_0(s,k)
+    \rVert^2, \\ %\qquad  (s,k) \in \Omega_S \times \Omega_K, \\
+    &\mathcal{L}_{bc}(u^\theta) :=
+    \lVert
+    u^\theta(\tau,s,k) - g(\tau,s,k)
+    \rVert^2,\\ %\qquad (\tau,s,k) \in [0,T] \times \partial\Omega_S \times \Omega_K, \\
+    &\mathcal{L}_{total}(u^\theta) := 
+    \mathcal{L}_{eq}(u^\theta) + \mathcal{L}_{ic}(u^\theta) + \mathcal{L}_{bc}(u^\theta),
+\end{aligned}
+\end{equation}
+where $\mathcal{L}_{total}(u^\theta)$ is the objective function.
+The notation $\|\cdot\|$ means the mean square error with respect to 
+the discretizations of $\tau$ and/or $s$ and $k$.
+ If $\mathcal{L}_{total}(u^\theta)=0$, then $u^\theta(\tau,s,k)$ is a solution of BSE.
+ 
+In \cite{cybenko1989approximation, sirignano2018dgm},
+ define by $\mathbb{C}^n$ the class of neural networks with a single hidden layer and $n$ hidden units. Let $u^n$ be a neural network with $n$ hidden units which minimizes $\mathcal{L}_{total}(u^n)$. It is proved that, under certain conditions,
+\begin{equation}\label{eqn:32}
+\begin{aligned}
+    &\text{there exists }u^n \in \mathbb{C}^n \text{such that } \mathcal{L}_{total}(u^n) \to 0, \text{ as } n \to \infty, \text{ and} \\
+    &u^n \to V \text{ as } n \to \infty.
+\end{aligned}
+\end{equation}
+The goal of training neural network is to find a set of parameter $\theta$ such that the function $u^\theta(\tau,s,k)$ minimizes the total loss function $\mathcal{L}_{total} (u^\theta)$. If the total error is small, then neural network approximate the solution of PDE. 
+The algorithm is following:
+
+
+% 알고리즘
+\begin{algorithm}[H]\small
+\caption{Algorithm of PINN for local volatility BSE}
+    \textbf{Input:}
+    Vector of random spatial points $(\tau_i, s_i, k_i)$. \\
+    \textbf{Output:}
+    Vector of solutions of parametric BSE $u^{\theta}(\tau_i, s_i, k_i)$.
+\begin{algorithmic}
+    \State Initialize epoch as 0.
+    \While{
+    $\left(
+    \mathcal{L}_{total}(u^{\theta}) > 1e-7
+    \right)$
+    \text{ or epoch} $< 1000$
+    }
+        \State Initialize step as 0.
+        \State Uniformly generate random points
+        \State $(\tau_i^{(1)},s_i^{(1)},k_i^{(1)})$ from $[\theta,T]\times\Omega_S\times\Omega_K$
+        \State $(s_i^{(2)},k_i^{(2)})$ from $\Omega_S\times\Omega_K$
+        \State $(\tau_i^{(3)},s_i^{(3)},k_i^{(3)})$ from $[0,T]\times \partial\Omega_S\times \Omega_K$
+        \While{
+            $\left(
+            \mathcal{L}_{total}(u^{\theta}) > 1e-7
+            \right)$
+            \text{ or step} $< 5000$
+            }
+            \State Calculate the total loss at the random sampled points where ${\mathcal L}_{total}$
+            \State $={\mathcal L}(u^\theta (\tau_i^{(1)},s_i^{(1)},k_i^{(1)}))
+            	+{\mathcal L}_{ic} (u^\theta (s_i^{(2)},k_i^{(2)}))
+			 	+{\mathcal L}_{bc} (u^\theta (\tau_i^{(3)},s_i^{(3)},k_i^{(3)}))$.
+            \State Take a gradient descent step with Adam optimizer for $\theta$.
+            \State Add 1 to step.
+        \EndWhile
+        \State Add 1 to epoch.
+    \EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Transfer learning}\label{translearning}
+In off-line phase, as the number of the parameters in neural networks increases, so is the accuracy of the approximation. However, computing time also increases. To overcome this, we use the transfer learning used in machine learning. With the transfer learning scheme, we first train a neural network in a local volatility model, and then using this pre-trained neural network, we train the neural network for other local volatility model. 
+
+We show that during the numerical simulation, the second training process converges faster than the first training. In the simulation we find in Tables \ref{table:1} and \ref{table:2}, the computation and convergence rates are more efficient than those of random initialization network when adopting transfer learning. Table \ref{table:1} shows the speed and error of the training process for the neural network in which the parameters are random initialized without the transfer learning scheme. Table \ref{table:2} shows the speed and error of the training process with a pre-trained neural network of which the parameters had been fitted to a different local volatility model. These two models train the same volatility surface model. The tables show that the transfer learning is more efficient. As a result, transfer learning is efficient in both computational speed and convergence. 
+
+\begin{minipage}{0.4\textwidth}
+% Table 1. Random initialized neural network training
+\begin{table}[H]\small
+%\centering
+\begin{tabular}{|c|c|c|}
+\hline
+Step                 & Time        & Training       \\ 
+             &(seconds)        & error       \\ \hline
+1000                 & 74.01                & 0.010114             \\ \hline
+2000                 & 135.25               & 0.002174             \\ \hline
+4000                 & 258.20               & 0.002027             \\ \hline
+8000                 & 521.36               & 0.000427             \\ \hline
+16000                & 1032.19              & 8.85669E-05          \\ \hline
+32000                & 1984.73              & 5.97776E-06          \\ \hline
+\end{tabular}
+\caption{Random initialized neural network training}
+\label{table:1}
+\end{table}
+\end{minipage}\hspace{10mm}
+\begin{minipage}{0.4\textwidth}
+% Table 2. Pre-trained neural network training
+\begin{table}[H]\small
+%\centering
+\begin{tabular}{|c|c|c|}
+\hline
+Step  & Time & Training \\
+     & (seconds) & error \\ \hline
+1000  & 47.61         & 3.15432E-05    \\ \hline
+2000  & 82.07         & 1.05102E-05    \\ \hline
+4000  & 150.59        & 4.11163E-06    \\ \hline
+8000  & 299.56        & 2.51589E-06    \\ \hline
+16000 & 610.32        & 9.96727E-07    \\ \hline
+32000 & 1068.40       & 6.59060E-07    \\ \hline
+\end{tabular}
+\caption{Pre-trained neural network training}
+\label{table:2}
+\end{table}
+\end{minipage}
+
+\subsection{Numerical results}\label{sec:Mu_nu1}
+We implement the neural networks of local volatility models \eqref{eqn:1}, \eqref{eqn:5} and \eqref{eqn:14} in TensorFlow2 on a GeForce RTX 3070. We describe our result in two ways. For local volatility models in which a closed form solution of European put option exists, we evaluate price and greeks(Delta, Gamma, Theta) with the neural networks. In case that there is no a closed form solution of European put option, we evaluate Dupire's equation \eqref{eqn:4} with neural networks 
+\begin{equation}\label{eqn:33}
+    \sigma^2_{NN} = 
+    2 \big( \frac{\partial u^\theta}{\partial T} + rK\frac{\partial u^\theta}{\partial K}\big) /
+    \big(K^2 \frac{\partial^2 u^\theta}{\partial K^2}\big).
+\end{equation}
+
+% Figure 1. Volatility surface 자리
+\begin{wrapfigure}{r}{0.45\textwidth}
+    \centering
+	\includegraphics[scale=0.45]{./Figure/fig1_Vol_surface}
+	\caption{Local volatility surface obtained from EUROSTOXX50 option data of January 15, 2016.}  
+   	\label{fig:1}
+\end{wrapfigure} 
+
+If the neural network $u^\theta (\tau,s,k)$ is well trained with the object function \eqref{eqn:31} for European put options, 
+then \eqref{eqn:33} should be equal to the local volatility function.
+Instead of the price of the underlying asset, moneyness is used and the maturity is fixed at one year $T=1$.
+Risk-free interest rate is $r=0.01$, volatility is $\sigma=0.3$,
+strike price fixed $k=1$, and for CEV model we consider $\beta=1,3$. 
+
+In this subsection, for volatility surface model, we use the market European option data consisting of several maturities and strike prices of which underlying asset is EUROSTOXX50 as of January 15, 2016. We adopt \cite{ART002181552} to derive volatility surface from market data (see Figure \ref{fig:1}). 
+Based on the volatility surface in Figure \ref{fig:1}
+ as a local volatility $\sigma(S_t,t)$ in \eqref{eqn:1}, we calculate all prices and Greeks.
+
+According to \eqref{eqn:32}, the higher the number of hidden units, the better the approximation.
+We have adopted the number of hidden units 20,000.
+ We have used the softplus function as an activation function.
+
+\subsubsection{GBM}
+For GBM, we fix $\sigma=0.3$ as a plane volatility surface.
+Figures \ref{fig:3} and \ref{fig:4} show price, delta, gamma and theta of European put option with GBM.
+ Figure \ref{fig:3} is obtained from the solution formula,
+and Figure \ref{fig:4} is calculated by PINN.
+In Figure \ref{fig:5}, we evaluate $L^2$ errors of price, delta, gamma and theta.
+Table \ref{table:3} shows $L^2$ errors of price and Greeks.
+%
+% Figure 3. Solution of European put option price and Greeks with GBM price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[hbt]
+    \centerline{\includegraphics[scale=0.5]
+       {Figure/fig3_SolutionofEuropeanputoptionpriceandGreekswithGBM.png}}
+    %\vspace{-5mm}
+    \caption{European put option price and Greeks with GBM:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:3}
+\end{figure}
+% Figure 4. GBM neural network approximation of European put option price and Greeks price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[ht] 
+    \centerline{\includegraphics[scale=0.5]
+       {Figure/fig4_GBMneuralnetworkapproximationofEuropeanputoptionpriceandGreeks.png}}
+ %   \vspace{-15mm}
+    \caption{PINN approximation of European put option price and Greeks with GBM:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:4}
+\end{figure}
+% Figure 5. L-2 error of GBM neural network price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[ht]
+    \centerline{\includegraphics[scale=0.5]{Figure/fig5_L-2errorofGBMneuralnetwork.png}}
+%    \vspace{-15mm}
+    \caption{$L^2$ errors of GBM via PINN:
+       price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:5}
+\end{figure}
+%
+% Table 3. GBM Neural network’s Maximum and Minimum error of price and Greeks
+\begin{table}[hb]\small
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+                    & Price   & Delta   & Gamma   & Theta   \\ \hline
+Maximum $L^2$ error & 0.00048 & 0.00201 & 0.02858 & 0.00103 \\ \hline
+Minimum $L^2$ error & 4e-09   & 6e-14   & 2e-12   & 4e-13   \\ \hline
+\end{tabular}
+\caption{GBM Neural network’s $L^2$ errors of price and Greeks}
+\label{table:3}
+\end{table}
+
+Figure \ref{fig:2:6} shows the constant volatility and volatility obtained by solving \eqref{eqn:33}
+ of GBM via PINN.
+% Figure 2. Volatility surface of GBM with σ=0.3 자리
+\begin{figure}[H] \centering
+    \subfigure[Volatility surface of GBM with $\sigma=0.3$]
+    {\includegraphics[scale=0.4]{Figure/fig2_Volatility surface of GBM with sig 03.png}}
+% Figure 6. Dupire's equation of GBM neural network 자리
+    \subfigure[Dupire's equation with PINN]{\includegraphics[scale=0.37]
+      {Figure/fig6_Dupire's equation of GBM neural network.png}} \vspace{-3mm}
+    \caption{Constant volatility $\sigma=3$ (left) and Volatility obtained by \eqref{eqn:33}.}
+    \label{fig:2:6}
+\end{figure}
+
+\subsubsection{CEV model}
+
+One of the extention of BSE is CEV model.
+We provide the results of whether the neural network (PINN) approximates the solution
+ and Dupire's equation well for CEV model.
+From our results, we show that the neural network approximates the parametric PDE
+ as well as its derivatives simultaneously. 
+
+We implement CEV for $\beta=1$ and $\beta=3$. 
+With fixed $\sigma=0.3$, \eqref{eqn:17:19} is used to evaluate for $\beta=1, 3$.
+Volatility surfaces of CEV model with $\beta=1,3$
+   are shown in Figure \ref{fig:7:8}.
+Prices, deltas, gammas, thetas of European put option with CEV
+obtained from the solution formula
+are privided 
+in Figure \ref{fig:9} for $\beta=1$,
+and in Figure \ref{fig:10} for $\beta=3$.
+Table \ref{table:4:5} %and \ref{table:5}
+ provides $L^2$ errors of prices and Greeks obtained by PINN.
+\begin{table}[H]\small
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+CEV $(\beta=1)$   & Price   & Delta   & Gamma   & Theta   \\ \hline
+Maximum $L^2$ error & 0.00048 & 0.00201 & 0.02858 & 0.00103 \\ \hline
+Minimum $L^2$ error & 4e-09   & 6e-14   & 2e-12   & 4e-13   \\ \hline
+\end{tabular}
+%\caption{CEV$(\beta=1)$ Neural network’s $L^2$ errors of price and Greeks}
+%\label{table:4}
+%\end{table}
+% Table 5. CEV(β=3) Neural network’s Maximum and Minimum error of price and Greeks
+%\begin{table}[H]\small
+%\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+CEV $(\beta=3)$   & Price   & Delta   & Gamma   & Theta   \\ \hline
+Maximum $L^2$ error & 0.00055 & 0.00230 & 0.03415 & 0.00171 \\ \hline
+Minimum $L^2$ error & 1e-09   & 4e-10   & 7e-09   & 3e-09   \\ \hline
+\end{tabular}
+\caption{CEV $(\beta=1,3)$ Neural network’s $L^2$ errors of price and Greeks}
+\label{table:4:5}
+\end{table}
+     
+In Figures \ref{fig:11}($\beta=1$) and \ref{fig:12}($\beta=3$),
+ prices, deltas, gammas and thetas of European put option with CEV model
+  approximated by PINN are shown.
+  In Figures \ref{fig:13}($\beta=1$) and \ref{fig:14}($\beta=3$),
+   we evaluated $L^2$ error of price(left top), delta(right top), gamma(left bottom)
+    and theta(right bottom) for CEV model.
+     Table 4 and 5 shows error of price and Greeks. 
+     Figure \ref{fig:15:16} shows \eqref{eqn:33} of both CEV models. 
+ Dupire's equations of the CEV neural networks have a similar shape to the local volatility functions of CEV, indicating that the approximation of the parametric PDE is well done.
+
+\begin{figure}[ht] \centering
+ \subfigure[$\beta=1$]
+   {\includegraphics[scale=0.33]{Figure/fig7_Volatility surface of CEV model with beta 1.png}}
+ \subfigure[$\beta=3$]
+    {\includegraphics[scale=0.33]{Figure/fig8_Volatility surface of CEV model with beta 3.png}}
+    \caption{Volatility surfaces of CEV model with $\beta=1$ and $\beta=3$.}
+\label{fig:7:8}
+\end{figure}
+% Figure 9. Solution of European put option price and Greeks with CEV (β=1) price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[h]
+    \centerline{\includegraphics[scale=0.45]{Figure/fig9_Solution of European put option price and Greeks with CEV beta 1.png}}
+   % \vspace{-15mm}
+    \caption{European put option price and Greeks with CEV $(\beta=1)$:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+    \label{fig:9}
+\end{figure}
+% Figure 10. Solution of European put option price and Greeks with CEV (β=3) price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[ht]
+    \centerline{\includegraphics[scale=0.5]
+    {Figure/fig10_SolutionofEuropeanputoptionpriceandGreekswithCEVbeta3.png}}
+  %  \vspace{-15mm}
+    \caption{European put option price and Greeks with CEV $(\beta=3)$:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:10}
+\end{figure}
+
+% Figure 11. CEV (β=1) neural network approximation of European put option price and Greeks price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[H]\vspace{-5mm}
+    \centerline{\includegraphics[scale=0.45]
+    {Figure/fig11_CEVbeta1neuralnetworkapproximationofEuropeanputoptionpriceandGreeks.png}}
+    \caption{CEV $(\beta=1)$ PINN approximation of European put option price and Greeks 
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:11}
+\end{figure}
+% Figure 12. CEV (β=3) neural network approximation of European put option price and Greeks price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[H]\vspace{-5mm}
+    \centerline{\includegraphics[scale=0.45]
+    {Figure/fig12_CEVbeta3neuralnetworkapproximationofEuropeanputoptionpriceandGreeks.png}}
+ %   \vspace{-15mm}
+    \caption{CEV $(\beta=3)$ PINN approximation of European put option:
+   price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:12}
+\end{figure}
+% Figure 13. L-2 error of CEV (β=1) neural network price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[H]
+    \centerline{\includegraphics[scale=0.45]
+    {Figure/fig13_L-2errorofCEVbeta1neuralnetwork.png}}
+%    \vspace{-15mm}
+    \caption{$L^2$ errors of CEV $(\beta=1)$ of PINN:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:13}
+\end{figure}
+% Figure 14. L-2 error of CEV (β=3) neural network price(left top), delta(right top), gamma(left bottom), theta(right bottom) 자리
+\begin{figure}[H]\vspace{-5mm}
+    \centerline{\includegraphics[scale=0.45]
+    {Figure/fig14_L-2errorofCEVbeta3neuralnetwork.png}}
+%    \vspace{-15mm}
+    \caption{$L^2$ errors of CEV $(\beta=3)$ of PINN:
+price(left top), delta(right top), gamma(left bottom), theta(right bottom)}  
+	\label{fig:14}
+\end{figure}
+
+% Figure 15. Dupire's equation of CEV (β=1) neural network 자리
+\begin{figure}[H]\centering
+\subfigure[$\beta=1$]
+{\includegraphics[scale=0.4]{Figure/fig15_Dupire's equation of CEV beta 1 neural network.png}}
+\subfigure[$\beta=3$]
+{\includegraphics[scale=0.4]{Figure/fig16_Dupire's equation of CEV beta 3 neural network.png}}
+    \caption{Volatility surfaces of CEV $(\beta=1)$ and $(\beta=3)$ via PINN}  
+       \label{fig:15:16}
+\end{figure}
+% Figure 16. Dupire's equation of CEV (β=3) neural network 자리
+%\begin{figure}[H]
+%\centerline{\includegraphics[scale=0.55]{Figure/fig16_Dupire's equation of CEV beta 3 neural network.png}}
+%    \caption{Dupire's equation of CEV $(\beta=3)$ neural network}  
+%	\label{fig:16}
+%\end{figure}
+
+
+
+\subsubsection{Volatility surface model}
+We have used the volatility surface in  Figure \ref{fig:1} as the local volatility function.
+Figure \ref{fig:17}
+ shows price), delta, gamma and theta of European put option
+  with the volatility surface approximated by the neural network.
+  Comparing GBM and CEV models, gamma is the lower, and theta is the higher when time $t$ is $0$. 
+ Figure \ref{fig:18} shows the local volatility surface obtained by \eqref{eqn:33}.
+
+% Figure 17. Volatility surface neural network approximation of European put option price and Greeks price(left top), delta(right top), gamma(left bottom) and theta(right bottom) 자리
+\begin{figure}[htb]
+    \centerline{\includegraphics[scale=0.45]
+    {Figure/fig17_VolatilitysurfaceneuralnetworkapproximationofEuropeanputoptionpriceandGreeks.png}}
+ %   \vspace{-15mm}
+    \caption{Volatility surface PINN approximation of European put option price and Greeks:
+price(left top), delta(right top), gamma(left bottom) and theta(right bottom)}  
+	\label{fig:17}
+\end{figure}
+% Figure 18. Dupire's equation of volatility surface neural network 자리
+\begin{wrapfigure}{r}{0.4\linewidth} %[hbt]
+    \centerline{\includegraphics[scale=0.4]
+    {Figure/fig18_Dupire's equation of volatility surface neural network.png}}
+    \caption{Local volatility surface obtained by PINN \eqref{eqn:33}}
+	\label{fig:18}
+\end{wrapfigure}
+
+% Seunggu
+\section{ELS pricing with PINN}
+% \chapter{Introduction}
+
+\subsection{2 Asset step-down ELS}
+As a representative product of ELS, step-down ELS has a structure in which the suggested rate of return is obtained when certain early redemption conditions are met for each autocall early redemption evaluation date during the investment period, and the early redemption conditions are lowered in a cascade. And there is a Knock-In Barrier in the range lower than the early redemption condition, and even if the early redemption condition is not met before maturity, if the value of the underlying asset has never fallen below the knock-in barrier, the proposed rate of return can be obtained. Even when the value of the underlying assets has fallen below the knock-in barrier during the investment period, if all underlying assets rebound to the extent that the redemption conditions are met before maturity, the principal amount and the proposed rate of return can be obtained. 
+
+It is important to calculate the price and Greeks of ELS because they have a significant impact on decision-making of investor and hedging strategy of issuer. 
+%To solve BSE numerically and calculate the price of ELS, existing researches mainly used FDM.
+ In \cite{jeong2010operator}, OSM is used to solve the multi-dimensional BSE
+  and to calculate the price of ELS. 
+As PINN has been widely used to solve PDEs, it has also been used in option pricing
+ (refer to \cite{\cite{Bai-2022}, Wang-2022}).
+In this paper, we apply PINN to the multi-dimensional BSE and calculate the price
+and Greeks of a two-asset step-down ELS. Then, we compare the price and Greeks by PINN with those by OSM.
+
+We selected example product to evaluate two-asset step-down ELS. The product is Korea Investment $\&$ Securities TRUE ELS 14361. It has two underlying assets and step down payoff structure.
+
+\subsubsection{Overview of 2 Asset step-down ELS}
+\vspace{-5mm}
+\begin{figure}[H]
+    \centerline{\includegraphics[scale=1]{Figure/ELS_payoff_diagram.png}}
+    \caption{Payoff of Korea Investment $\&$ Securities TRUE ELS 14361}  
+    \label{fig:Payoff}
+\end{figure}
+
+Figure \ref{fig:Payoff} is a payoff structure of example product.
+ The explanation of this ELS product is the following:
+\begin{enumerate}
+    \item At each autocall early redemption evaluation date, if all of the prices of the underlying assets are greater than or equal to the strike price of the date, then the face value and the predetermined coupons are paid to a investor.
+    \item At the maturity date, if all of the prices of the underlying assets are greater than or equal to the strike price of the date, then the face value and the predetermined coupons are paid to a investor.
+    \item At the maturity date, when the above 2 is not satisfied, if all of the prices of the underlying assets haven't been less than the knock-in barrier even once before the maturity date, then the face value and the dummy are paid to a investor.
+    \item At the maturity date, when the above 2 and 3 are not satisfied, if at least one of the prices of the underlying assets have been less than the knock-in barrier even once before the maturity date, then the face value multiplied by ($1$ - rate of return of the most declined underlying asset) is paid to a investor.
+\end{enumerate}
+
+%\begin{table}[H]
+%\centering
+%\begin{tabular}{|c|c|}
+%\hline
+%\textbf{Parameter}                                                                                                                                                                                                     & \textbf{value}                                                                                                   \\ \hline
+%Underlying asset price $S_1(t_0)$                                                                                                                                                                             & 100                                                                                                     \\ \hline
+%Underlying asset price $S_2(t_0)$                                                                                                                                                                             & 100                                                                                                     \\ \hline
+%Volatility $\sigma_1$                                                                                                                                                                                         & 28.6\%                                                                                                  \\ \hline
+%Volatility $\sigma_2$                                                                                                                                                                                         & 54.7\%                                                                                                  \\ \hline
+%Correlation coefficient $\rho$                                                                                                                                                                                & 0.5371                                                                                                  \\ \hline
+%Dividend yield $d_1$                                                                                                                                                                                          & 0                                                                                                       \\ \hline
+%Dividend yield $d_2$                                                                                                                                                                                          & 0                                                                                                       \\ \hline
+%Risk-free rate $r_f$                                                                                                                                                                                          & 0.45\%                                                                                                  \\ \hline
+%Face value $F$                                                                                                                                                                                                & 100                                                                                                    \\ \hline
+%Strike $K_i, (i = 1, \ldots, 6)$                                                                                                                                                                              & 85\%, 85\%, 85\%, 80\%, 80\%, 70\%                                                                      \\ \hline
+%Coupon rate $c_i, (i = 1, \ldots, 6)$                                                                                                                                                                         & 9.1\% (Annual)                                                                                          \\ \hline
+%Dummy $d$                                                                                                                                                                                                     & 27.3\%                                                                                                  \\ \hline
+%Knock-In Barrier $B$                                                                                                                                                                                          & 45\%                                                                                                    \\ \hline
+%Issue Date $t_0$                                                                                                                                                                                              & 21.09.17                                                                                                \\ \hline
+%\end{tabular}
+%\end{table}
+%
+% \begin{table}[H]
+% \centering
+% \begin{tabular}{|c|c|}
+% \hline
+%
+% \begin{tabular}[c]{@{}c@{}}1st Evaluation Date $t_1$\\ 2nd Evaluation Date $t_2$\\ 3rd Evaluation Date $t_3$\\ 4th Evaluation Date $t_4$\\ 5th Evaluation Date $t_5$\end{tabular} & \begin{tabular}[c]{@{}c@{}}22.03.14\\ 22.09.13\\ 23.03.14\\ 23.09.12\\ 24.03.12\end{tabular} \\ \hline
+% \text{   } Maturity Date $t_6$ \text{   }                                                                                                                                                                                            & \text{          } 24.09.09 \text{      }                                                                                  \\ \hline
+% \end{tabular}
+%
+% \end{table}
+%
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
+%\begin{table}[H]
+%\centering
+%\begin{tabular}{cc}
+%{\color[HTML]{FFFFFF} Underlying asset price $S_1(t_0)$}                                                                                                                                                %& {\color[HTML]{FFFFFF} 85\%, 85\%, 85\%, 80\%, 80\%, 70\%}                                                         %\\ \hline
+%\multicolumn{1}{|c|}{\begin{tabular}[c]{@{}c@{}}1st Evaluation Date $t_1$\\ 2nd Evaluation Date $t_2$\\ 3rd Evaluation Date $t_3$\\ 4th Evaluation Date $t_4$\\ 5th Evaluation Date $t_5$\end{tabular}} & \multicolumn{1}{c|}{\begin{tabular}[c]{@{}c@{}}22.03.14\\ 22.09.13\\ 23.03.14\\ 23.09.12\\ 24.03.12\end{tabular}} \\ \hline
+%\multicolumn{1}{|c|}{Maturity Date $t_6$}                                                                                                                                                               & \multicolumn{1}{c|}{24.09.09}                                                                                     \\ \hline
+%\end{tabular}
+%\caption{Parameters and Issuance information of ELS}
+%\label{table:Parameters}
+%\end{table}
+
+\begin{table}[H]\small
+\centering
+\begin{tabular}{|c|c|}
+\hline
+\textbf{Parameter}                                                                                                                                                                & \textbf{value}                                                                               \\ \hline
+Underlying asset price $S_1(t_0)$                                                                                                                                                 & 100                                                                                          \\ \hline
+Underlying asset price $S_2(t_0)$                                                                                                                                                 & 100                                                                                          \\ \hline
+Volatility $\sigma_1$                                                                                                                                                             & 28.6\%                                                                                       \\ \hline
+Volatility $\sigma_2$                                                                                                                                                             & 54.7\%                                                                                       \\ \hline
+Correlation coefficient $\rho$                                                                                                                                                    & 0.5371                                                                                       \\ \hline
+Dividend yield $d_1$                                                                                                                                                              & 0                                                                                            \\ \hline
+Dividend yield $d_2$                                                                                                                                                              & 0                                                                                            \\ \hline
+Risk-free rate $r_f$                                                                                                                                                              & 0.45\%                                                                                       \\ \hline
+Face value $F$                                                                                                                                                                    & 100                                                                                          \\ \hline
+Strike $K_i, (i = 1, \ldots, 6)$                                                                                                                                                  & 85\%, 85\%, 85\%, 80\%, 80\%, 70\%                                                           \\ \hline
+Coupon rate $c_i, (i = 1, \ldots, 6)$                                                                                                                                             & 9.1\% (Annual)                                                                               \\ \hline
+Dummy $d$                                                                                                                                                                         & 27.3\%                                                                                       \\ \hline
+Knock-In Barrier $B$                                                                                                                                                              & 45\%                                                                                         \\ \hline
+Issue Date $t_0$                                                                                                                                                                  & 21.09.17                                                                                     \\ \hline
+\begin{tabular}[c]{@{}c@{}}1st Evaluation Date $t_1$\\ 2nd Evaluation Date $t_2$\\ 3rd Evaluation Date $t_3$\\ 4th Evaluation Date $t_4$\\ 5th Evaluation Date $t_5$\end{tabular} & \begin{tabular}[c]{@{}c@{}}22.03.14\\ 22.09.13\\ 23.03.14\\ 23.09.12\\ 24.03.12\end{tabular} \\ \hline
+Maturity Date $t_6$                                                                                                                                                               & 24.09.09                                                                                     \\ \hline
+\end{tabular}
+\caption{Parameters and Issuance information of ELS}
+\label{table:Parameters}
+\end{table}
+
+In this section, we use parameters in Table \ref{table:Parameters}. We assume that volatilities of underlying assets and risk-free rate are constant, and there is no dividend, and each evaluation date is the same as the each redemption date. With respect to time parameter, we assumed that $t$ is the actual number of days in the period from one date to another date divided by 365, and we define from $t_0$ to $t_6$ as the actual number of days in the period from issue date to issue date and each evaluation date.  
+
+\subsubsection{Initial and boundary conditions for ELS}
+To evaluate 2 Asset step-down ELS, we solve the two-dimensional BSE. The ELS has different prices when the knock-in barrier is touched and when it is not touched. Therefore, we consider initial and boundary conditions and some several conditions with two cases. One is when the underlying asset price does not touch the knock-in barrier, and the other is when the underlying asset price touches the knock-in barrier. The two-dimensional BSE with initial and boundary conditions for pricing 2 Asset step-down ELS is as follows:
+\begin{equation}\label{eqn:2D-BSE}
+\begin{aligned}
+    &\frac{\partial V}{\partial t}
+        + \frac{1}{2} \sigma_1^2 S_1^2(t) \frac{\partial^2 V}{\partial S_1^2}
+        + \frac{1}{2} \sigma_2^2 S_2^2(t) \frac{\partial^2 V}{\partial S_2^2} 
+       + \rho \sigma_1 \sigma_2 S_1(t) S_2(t) \frac{\partial^2 V}{\partial S_1 \partial S_2} \\
+   &\hspace{40mm} + rS_1(t)\frac{\partial V}{\partial S_1} 
+        + rS_2(t)\frac{\partial V}{\partial S_2}
+        = rV.
+\end{aligned}
+\end{equation} 
+\\
+\textbf{Initial condition} for $V(S_1,S_2,T)$:
+\begin{equation*}
+\begin{aligned}
+    V(S_1,S_2,T)_{\text{No touch}} = 
+    \begin{cases}
+    (1 + c_6) \times F
+    & \hspace{-3mm} \mbox{if } 
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) 
+    \ge K_6,  \\
+    (1 + d) \times F 
+    &\hspace{-10mm} \mbox{if }  
+    K_6 > 
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) 
+    \ge B, \\
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) \times F
+    & \mbox{if }  
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) 
+    < B,
+    \end{cases}
+\end{aligned}
+\end{equation*}
+\begin{equation*}
+\begin{aligned}
+    V(S_1,S_2,T)_{\text{touch}} = 
+    \begin{cases}
+    (1 + c_6) \times F
+    & \mbox{if } 
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) 
+    \ge K_6,  \\
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) \times F
+    & \mbox{if } 
+    \min \bigg(\frac{S_1(T)}{S_1(t_0)}, \frac{S_2(T)}{S_2(t_0)}\bigg) 
+    < K_6,
+    \end{cases}
+\end{aligned}
+\end{equation*}
+where $V(S_1,S_2,t)$ is the price of ELS and other parameters are in Table \ref{table:Parameters}.
+The maximum value of $S_1, S_2$ is defined by $L$, we assume $L = 300$ in this section.
+The available ranges of $S_1, S_2$ are $0 \le S_1, S_2 \le L$. 
+As the boundary conditions, we consider the linear boundary conditions when $S_1 = 0$ or $S_2 = 0$
+ and when $S_1 = L$ or $S_2 = L$. 
+
+\noindent \textbf{Boundary condition}
+\begin{equation*}
+\begin{aligned}
+    & \frac{\partial^2 V(0,S_2,t)_{\text{No touch}}}{\partial S_1^2} = 0, 
+    \quad \frac{\partial^2 V(S_1,0,t)_{\text{No touch}}}{\partial S_2^2} = 0, \\ 
+    & \frac{\partial^2 V(0,S_2,t)_{\text{touch}}}{\partial S_1^2} = 0, 
+    \qquad \frac{\partial^2 V(S_1,0,t)_{\text{touch}}}{\partial S_2^2} = 0,
+    \\
+    & \frac{\partial^2 V(L,S_2,t)_{\text{No touch}}}{\partial S_1^2} = 0, 
+    \quad \frac{\partial^2 V(S_1,L,t)_{\text{No touch}}}{\partial S_2^2} = 0, \\ 
+    & \frac{\partial^2 V(L,S_2,t)_{\text{touch}}}{\partial S_1^2} = 0, 
+    \qquad \frac{\partial^2 V(S_1,L,t)_{\text{touch}}}{\partial S_2^2} = 0. \\
+\end{aligned}
+\end{equation*}
+
+Additionally, we consider payoff of autocall early redemption dates. At each evaluation date, ELS is redeemed with paying predetermined profit to investors. Therefore, the price of ELS is sum of the face value and the predetermined coupon when the condition of autocall early redemption is satisfied.
+
+\noindent\textbf{Autocall early redemptions}
+%
+\qquad $\mbox{for } i = 1, \ldots, 5$,
+\begin{equation*}
+\begin{aligned}
+    & V(S_1,S_2,t_i)_{\text{No touch}} = 
+    (1 + c_i) \times F,
+    \quad \mbox{if } 
+    \min \bigg(\frac{S_1(t_i)}{S_1(t_0)}, \frac{S_2(t_i)}{S_2(t_0)} \bigg) 
+    \ge K_i, \\
+    & V(S_1,S_2,t_i)_{\text{touch}} = 
+    (1 + c_i) \times F,
+    \qquad \mbox{if } 
+    \min \bigg(\frac{S_1(t_i)}{S_1(t_0)}, \frac{S_2(t_i)}{S_2(t_0)} \bigg) 
+    \ge K_i.
+\end{aligned}
+\end{equation*}
+Finally, when at least one of the underlying asset price is below the knock-in barrier, we consider one more condition to make the price of ELS when the knock-in barrier is not touched the same value with the price when the knock-in barrier is touched:
+\begin{equation*}
+\begin{aligned}
+    V(S_1,S_2,t)_{\text{No touch}}
+    = V(S_1,S_2,t)_{\text{touch}}
+    \quad \mbox{if } 
+    \min \bigg(\frac{S_1(t_i)}{S_1(t_0)}, \frac{S_2(t_i)}{S_2(t_0)} \bigg) 
+    < B.
+\end{aligned}
+\end{equation*}
+% OSM
+\subsection{Operator splitting method}
+%To solve \eqref{eqn:2D-BSE} numerically, OSM can be applied.
+OSM reduces multi-dimensional equation into multiple one-dimensional problems.
+ We can rewrite \eqref{eqn:2D-BSE} with respect to time to maturity $\tau = T - t$,
+\begin{equation}\label{eqn:2D-BSE_tau}
+\begin{aligned}
+    &\frac{\partial V}{\partial \tau} 
+    = \frac{1}{2} \sigma_1^2 S_1^2 \frac{\partial^2 V}{\partial S_1^2}
+    + \frac{1}{2} \sigma_2^2 S_2^2 \frac{\partial^2 V}{\partial S_2^2}
+    + \rho \sigma_1 \sigma_2 S_1 S_2 \frac{\partial^2 V}{\partial S_1 \partial S_2} \\
+    &+ r S_1 \frac{\partial V}{\partial S_1}
+    + r S_2 \frac{\partial V}{\partial S_2}  - rV.
+\end{aligned}
+\end{equation} 
+Let splitting operators with respect to $S_1$ and
+ $S_2$ denoted by $\mathcal{L}_{OS}^{S_1}V$, $\mathcal{L}_{OS}^{S_2}V$, and
+%\begin{equation}\label{eqn:sp-op}
+%\begin{aligned}
+ %   & \mathcal{L}_{OS}^{S_1}V 
+  %  := \frac{1}{2} \sigma_1^2 S_1^2 \frac{\partial^2 V}{\partial S_1^2}
+   % + r S_1 \frac{\partial V}{\partial S_1}
+    %+ \lambda_1 \rho \sigma_1 \sigma_2 S_1 S_2 \frac{\partial^2 V}{\partial S_1 \partial S_2}
+    %- \frac{1}{2} rV, \\
+   % & \mathcal{L}_{OS}^{S_2}V 
+   % := \frac{1}{2} \sigma_2^2 S_2^2 \frac{\partial^2 V}{\partial S_2^2}
+   % + r S_2 \frac{\partial V}{\partial S_2}
+   % + (1 - \lambda_1) \rho \sigma_1 \sigma_2 S_1 S_2 \frac{\partial^2 V}{\partial S_1 \partial S_2}
+   % - \frac{1}{2} rV.
+%\end{aligned}
+%\end{equation} 
+let $V_{ij}^n := V(S_{1i}, S_{2j}, \tau_n) = V(x_i, y_j, \tau_n)$, $h$ is the length of space intervals,
+ where $S_{1i}, S_{2j}$ are treated as space variables $x_i := ih, y_j := jh$, respectively,
+  and $\tau_n := n \Delta \tau$. 
+ %To discretize \eqref{eqn:sp-op},
+  % we apply implicit scheme with $\lambda=\frac{1}{2}$ to obtain
+ Then, we obtain the following systems:
+\begin{equation}\label{eqn:L_OS_S1}
+\begin{aligned}
+    &\frac{V_{ij}^{n + \frac{1}{2}} - V_{ij}^{n}}{\Delta \tau}
+    = \mathcal{L}_{OS}^{x}V^{n + \frac{1}{2}} \\ 
+    &:= \frac{1}{2} \sigma_x^2 x^2
+    \frac{V_{i-1, j}^{n + \frac{1}{2}} - 2V_{i, j}^{n + \frac{1}{2}} + V_{i+1, j}^{n+\frac{1}{2}}}{h^2}
+    + r x_i \frac{V_{i+1, j}^{n + \frac{1}{2}} - V_{i-1, j}^{n + \frac{1}{2}}}{2h}
+    - \frac{r}{2} V_{i, j}^{n + \frac{1}{2}} \\
+    &\qquad+ \frac{1}{2} \rho \sigma_x \sigma_y x_i y_j
+    \frac{V_{i+1, j+1}^{n} + V_{i-1, j-1}^{n} - V_{i-1, j+1}^{n} - V_{i+1, j-1}^{n}}{4h^2},
+\end{aligned}
+\end{equation} 
+\begin{equation}\label{eqn:L_OS_S2}
+\begin{aligned}
+    &\frac{V_{ij}^{n + 1} - V_{ij}^{n + \frac{1}{2}}}{\Delta \tau}
+    = \mathcal{L}_{OS}^{y}V^{n + 1} \\
+    &:= \frac{1}{2} \sigma_y^2 y^2
+    \frac{V_{i, j-1}^{n + 1} - 2V_{i, j}^{n + 1} + V_{i, j+1}^{n + 1}}{h^2}
+    + r y_j \frac{V_{i, j+1}^{n + 1} - V_{i, j-1}^{n + 1}}{2h}
+    - \frac{r}{2} V_{i, j}^{n + 1} \\
+    &\qquad+ \frac{1}{2} \rho \sigma_x \sigma_y x_i y_j
+    \frac{V_{i+1, j+1}^{n + \frac{1}{2}} + V_{i-1, j-1}^{n + \frac{1}{2}}
+     - V_{i-1, j+1}^{n + \frac{1}{2}} - V_{i+1, j-1}^{n + \frac{1}{2}}}{4h^2}.
+\end{aligned}
+\end{equation} 
+%where $V_{ij}^k := V(x_i,y_j,k \Delta \tau)$. 
+In OS schemes, difference with respect to time is sum of splitting operator $\mathcal{L}_{OS}^{S_1}V$, $\mathcal{L}_{OS}^{S_2}V$,
+\begin{equation}\label{eqn:time_diff}
+\begin{aligned}
+    \frac{V_{ij}^{n + 1} - V_{ij}^{n}}{\Delta \tau}
+    = \mathcal{L}_{OS}^{x}V^{n + \frac{1}{2}}
+    + \mathcal{L}_{OS}^{y}V^{n + 1}.
+\end{aligned}
+\end{equation}
+Using the tridiagonal matrix algorithm, we calculate \eqref{eqn:L_OS_S1} in $x$-direction and \eqref{eqn:L_OS_S2} in $y$-direction sequentially. Then \eqref{eqn:time_diff} is obtained. Repeating this procedure as many times as the number of the time meshes, we calculate the price of the ELS. 
+
+\subsubsection{Tridiagonal matrix algorithm}
+Tridiagonal matrix algorithm also known as TDMA or Thomas algorithm is a simplified form of Gaussian elimination that can be used to solve tridiagonal systems of equations.
+ For such systems, the solution can be obtained in $O(n)$ operations instead of $O(n^{3})$
+  required by Gaussian elimination. %(Refer to \cite{wiki:Tridiagonal_matrix_algorithm}
+  A tridiagonal system for $n$ unknowns can be written as 
+\begin{equation*}%\label{eqn:23}
+\begin{aligned}
+&    a_i x_{i-1} + b_i x_i + c_i x_{i+1} = d_i, \qquad
+    \text{where }a_1=0, \text{ and } c_n = 0.
+\end{aligned}
+\end{equation*}
+\begin{algorithm}[H]\small
+\caption{Tridiagonal matrix algorithm}
+    \textbf{Input:}
+     Vectors $a, b, c, d$, and length of vectors $n$. \\
+    \textbf{Output:}
+    Unknown vector $x$.
+\begin{algorithmic}
+    \State Forward elimination phase.
+    \For{$i \in 2 \text{ to } n$}
+        \State $w = \frac{a[i]}{b[i-1]}$,
+        \State $b[i] = b[i] - w \times c[i-1]$,
+        \State $d[i] = d[i] - w \times d[i-1]$.
+    \EndFor 
+    \State Backward substitution phase.
+    \State $x[n] = \frac{d[n]}{b[n]}$. 
+    \For{$i \in n-1 \text{ to } 1$} 
+        \State $x[i] = \frac{d[i] - c[i] \times x[i+1]}{b[i]}$, 
+    \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+% solving 2D-BSE with PINN
+\subsection{PINN for ELS pricing}
+To apply PINN to \eqref{eqn:2D-BSE}, we need to set up the optimization problem.
+
+\subsubsection{Scale invariance of Black-Scholes model}
+Before setting up the optimization problem, we need to adjust the scale of problem.
+ When training PINN, it shows poor performance if inputs are large value without scaling.
+  To train PINN, we adjust the underlying asset price by dividing with 100,
+  and we also adjust the price of ELS by dividing with 100.
+  Because the price of ELS has the same scale with the price of underlying assets,
+   we esimate the scaled ELS price and multiply by 100.
+
+We can show that \eqref{eqn:2D-BSE} is scale invariant. We rewrite \eqref{eqn:2D-BSE_tau} setting
+$u(\tau, x, y):=V(\tau,S_1,S_2)$:
+\begin{equation}\label{eqn:3.7}\small
+\begin{aligned}
+  \hspace{-5mm}\frac{\partial u}{\partial \tau}
+    - \frac{1}{2} \sigma_x^2 x^2 \frac{\partial^2 u}{\partial x^2}
+    - \frac{1}{2} \sigma_y^2 y^2 \frac{\partial^2 u}{\partial y^2} %\\    &
+    - \rho \sigma_x \sigma_y x y \frac{\partial^2 u}{\partial x \partial y} 
+    - r x \frac{\partial u}{\partial x} 
+    - r y \frac{\partial u}{\partial y}
+    + ru
+    = 0.
+\end{aligned}
+\end{equation}
+From \eqref{eqn:3.7}, we obtain the following scaled equation $v(\tau,\hat{x},\hat{y})$
+\begin{equation}\label{eqn:3.8}\small
+\begin{aligned}
+\hspace{-5mm}\frac{\partial v}{\partial \tau}
+    - \frac{1}{2} \sigma_x^2 \hat{x}^2 \frac{\partial^2 v}{\partial \hat{x}^2}
+    - \frac{1}{2} \sigma_y^2 \hat{y}^2 \frac{\partial^2 v}{\partial \hat{y}^2} %\\     &
+    - \rho \sigma_x \sigma_y \hat{x} \hat{y} \frac{\partial^2 v}{\partial \hat{x} \partial \hat{y}} 
+    - r \hat{x} \frac{\partial v}{\partial \hat{x}}
+    - r \hat{y} \frac{\partial v}{\partial \hat{y}}
+    + rv
+    = 0.
+\end{aligned}
+\end{equation}
+In general, if the option price $u(\tau,x,y)$ satisfies \eqref{eqn:3.7}
+ for all $\tau \in [0, T], x \in [0, M], y \in [0,M]$ 
+ with the initial condition $u(0,x,y) = \psi(x,y)$,
+ where $x,y$ are the underlying asset price, and $M$ is a relatively large number,
+  then \eqref{eqn:3.8} holds for the scaled option price 
+  $v(\tau,\hat{x},\hat{y}) =\frac{u(\tau,x, y)}{N}$
+   with the initial condition $v(0,\hat{x},\hat{y}) = \frac{\psi(x,y)}{N}$, 
+  where the scaled variables
+  $\hat{x} = \frac{x}{N} \in [0, \frac{M}{N}], \hat{y} = \frac{y}{N} \in [0, \frac{M}{N}]$,
+   where $N$ is the real number.
+The parameters $\tau, r, \sigma_x, \sigma_y, \rho$ in \eqref{eqn:3.8}
+     are the same as those in \eqref{eqn:3.7}.  
+
+\subsection{Optimization problem}
+In this subsection, we define an objective function and loss functions and
+ train PINN with random spatial points $(\tau, x, y) \in [0,T] \times[0,3] \times [0,3]$,
+  where $\tau$ is time to maturity, $x, y$ are the scaled underlying asset prices.
+
+\noindent \textbf{Loss functions} 
+%
+\qquad $\mbox{for } i = 1, 2$,
+%
+\begin{equation*} \small %\label{eqn:Loss}
+\begin{aligned}
+    % PDE
+    & \mathcal{L}_{pde} (u_i^{\theta})
+    := \Big\lVert 
+    \frac{\partial u_i^{\theta}(\tau,x,y)}{\partial \tau}
+    - \frac{1}{2} \sigma_x^2 x^2 \frac{\partial^2 u_i^{\theta}(\tau,x,y)}{\partial x^2}
+    - \frac{1}{2} \sigma_y^2 y^2 \frac{\partial^2 u_i^{\theta}(\tau,x,y)}{\partial y^2} \\
+    & - \rho \sigma_x \sigma_y x y \frac{\partial^2 u_i^{\theta}(\tau,x,y)}{\partial x \partial y} 
+    - r x \frac{\partial u_i^{\theta}(\tau,x,y)}{\partial x} 
+    - r y \frac{\partial u_i^{\theta}(\tau,x,y)}{\partial y}
+    + ru_i(\tau,x,y)
+    \Big\rVert_2^2, \\
+    % Initial condition for u_i
+    & \mathcal{L}_{ic} (u_i^{\theta}) 
+    := \lVert 
+    u_i^{\theta}(0,x,y) - f_i(x,y)
+    \rVert_2^2, \\
+    % Boundary
+    & \mathcal{L}_{bc} (u_i^{\theta})
+    := \Big\lVert 
+    \frac{\partial^2 u_i^{\theta}(\tau,0,y)}
+    {\partial x^2}
+    \Big\rVert_2^2
+    + \Big\lVert 
+    \frac{\partial^2 u_i^{\theta}(\tau,x,0)}
+    {\partial y^2}
+    \Big\rVert_2^2
+    + \Big\lVert 
+    \frac{\partial^2 u_i^{\theta}(\tau,3,y)}
+    {\partial x^2}
+    \Big\rVert_2^2
+    + \Big\lVert 
+    \frac{\partial^2 u_i^{\theta}(\tau,x,3)}
+    {\partial y^2}
+    \Big\rVert_2^2, \\
+    % Autocall
+    & \mathcal{L}_{ac} (u_i^{\theta})
+    := \sum_{j=1}^5 
+    \lVert 
+    u_i^{\theta}(\tau_j,x,y) - (1 + c_j)
+    \rVert_2^2, \\
+    % ki 
+    & \mathcal{L}_{ki} (u_1^{\theta})
+    := \lVert 
+    u_1^{\theta}(\tau,x,y) - u_2^{\theta}(\tau,x,y)
+    \rVert_2^2, \\
+\end{aligned}
+\end{equation*}
+where
+\begin{equation*}
+\begin{aligned}
+    & f_1(x,y) = 
+    \begin{cases}
+    1 + c_6
+    & \mbox{if } 
+    \min (x,y) \ge K_6, \\
+    1 + d
+    & \mbox{if }  
+    K_6 > \min (x,y) \ge B, \\
+    \min (x,y)
+    & \mbox{if }  
+    \min (x,y) 
+    < B,
+    \end{cases} \\
+    & f_2(x,y) = 
+    \begin{cases}
+    1 + c_6
+    & \mbox{if } 
+    \min (x,y) \ge K_6, \\
+    \min (x,y) 
+    & \mbox{if }  
+    \min (x,y) 
+    < K_6.
+    \end{cases}
+\end{aligned}
+\end{equation*}
+
+\noindent \textbf{Objective function}
+%
+\begin{equation*}
+\begin{aligned}
+    & \text{No touch the knock-in barrier:} \\
+    &\qquad \mathcal{L}_{total} (u_1^{\theta})
+    = \mathcal{L}_{pde} (u_1^{\theta})
+    + \mathcal{L}_{ic} (u_1^{\theta})
+    + \mathcal{L}_{bc} (u_1^{\theta})
+    + \mathcal{L}_{ac} (u_1^{\theta})
+    + \mathcal{L}_{ki} (u_1^{\theta}), \\
+    & \text{Touch the knock-in barrier:} \\
+    &\qquad \mathcal{L}_{total} (u_2^{\theta})
+    = \mathcal{L}_{pde} (u_2^{\theta})
+    + \mathcal{L}_{ic} (u_2^{\theta})
+    + \mathcal{L}_{bc} (u_2^{\theta})
+    + \mathcal{L}_{ac} (u_2^{\theta}),
+\end{aligned}
+\end{equation*}
+where $u_1^{\theta}$ and  $u_2^{\theta}$ denote the scaled option price estimated
+ by PINN with no touch the knock-in barrier and
+ with touch the knock-in barrier, respectively,
+  and $\theta$ are parameters of neural network. 
+
+\begin{figure}[H]
+    \centerline{\includegraphics[scale=0.20]{Figure/PINN ELS.png}}
+    \caption{Schematic diagram of PINN for pricing ELS.}  
+    \label{fig:Schematic diagram}
+\end{figure}
+
+\begin{algorithm}[H]\small
+\caption{Algorithm for PINN}\label{algo:3}
+    \textbf{Input:}
+    Vector of random spatial points $(\tau, x, y) \in [0, T] \times [0, 3] \times [0, 3]$. \\
+    \textbf{Output:}
+    Vector of parametric solution of two-dimensional BSE $u_1^{\theta}$, $u_2^{\theta}$.
+\begin{algorithmic}
+    \State Initialize epoch as 0.
+    \While{
+    $\left(
+    \mathcal{L}_{total}(u_1^{\theta}) > 1e-5 \text{ or } \mathcal{L}_{total}(u_2^{\theta}) > 1e-5
+    \right)$
+    \text{ or epoch} $< 150$
+    }
+        \State Initialize step as 0.
+        \State Uniformly generate $N_{ic}, N_{ac}, N_{bc}, N_{pde}, N_{ki}$
+        \While{
+            $\left(
+            \mathcal{L}_{total}(u_1^{\theta}) > 1e-6 \text{ or } \mathcal{L}_{total}(u_2^{\theta}) > 1e-6
+            \right)$
+            \text{ or step} $< 200$
+            }
+            \State Calculate the total loss functions $\mathcal{L}_{total}(u_1^{\theta}), \mathcal{L}_{total}(u_2^{\theta})$. 
+            \State Update $\theta$ by back propagation algorithm.
+            \State Add 1 to step.
+        \EndWhile
+        \State Add 1 to epoch.
+    \EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+Figure \ref{fig:Schematic diagram} is the schematic diagram of PINN for pricing ELS.
+ As hyper parameters, we use the Adam optimizer with learning rate of 0.001, and 7 hidden layers.
+  Each hidden layer has 256 neurons, and softplus is used as a activation function.
+   Weights of each layer are initialized by Xavier initialization. 
+   We consider batch size
+    $N_{ic} = 500, N_{ac} = 500, N_{bc} = 400, N_{pde} = N_{ic} + N_{ac} + N_{bc} + 10000$.
+ And we consider $N_{ki}$ is the part of $N_{pde}$, which contains $x$ or $y$ that is less than $B$,
+  where $N_{ic}, N_{ac}, N_{bc}, N_{pde}, N_{ki}$ are the numbers of random spatial points to train PINN.
+For generalization performance of the model, in all hidden layers,
+ before the activation function operation is performed, batch normalization is performed.
+And we randomly generate spatial points for one epoch, and the points are discarded
+ and newly generated for every epochs. The algorithm of PINN is Algorithm \ref{algo:3}.
+
+\subsection{Numerical Simulation}
+We calculate the price of ELS and Greeks by implementing PINN, OSM
+ using CPU(12th Gen Intel(R) Core(TM) i9-12900KF), GPU(NVIDIA Corporation GA102
+ [GeForce RTX 3090] (rev a1)), and Pytorch. 
+
+\begin{figure}[H]
+\centering
+ \subfigure[Total loss for No touch.]{\includegraphics[width=0.3\linewidth]{Figure/Training_loss_u.png}}
+ \subfigure[Total loss for Touch.]{\includegraphics[width=0.3\linewidth]{Figure/Training_loss_ku.png}}
+ \caption{Total losses for PINN depending on the touch of knock-in barrier}  
+ \label{fig:Loss}
+\end{figure}
+
+Figure \ref{fig:Loss} shows change of total loss during the algorithm iteration. Loss for ELS when knock-in barrier is not touched is 6.2970e-3, and Loss for ELS when knock-in barrier is touched is 9.0489e-3. Given the hyper parameters we use, the value of loss appears to be fluctuated because we newly generate and use the random spatial points for every epochs.
+
+\subsubsection{Price}
+The result of pricing ELS is as follows:
+
+\begin{table}[H]\small
+\centering
+\begin{tabular}{ccc}
+\hline
+          & PINN                            & OSM                    \\
+          & (150 Epochs $\times$ 200 steps) & (Mesh: 61 $\times$ 61) \\ \hline
+Price(\$) & 90.9845                         & 88.1280                \\ 
+Time(sec) & 3793.3523                       & 12.4759                \\ \hline
+\end{tabular}
+\end{table}
+
+The real value of fair price in the investment prospectus is 85.5074.
+The prices obtained by OSM are similar to each other, and they are slightly larger than the real value.
+It is presumed that parameters and assumptions we use would be different from those used in reality. 
+The price by PINN appears similar to the price by OSM, but it is relatively larger than the real value and the prices by OSM. It is presumed that the reason of this phenomenon might be that PINN is not trained enough with iteration of 30000 times given hyper parameters. 
+
+Figures \ref{ELS OSM u}, \ref{ELS OSM ku} are prices calculated by OSM, and Figures \ref{ELS PINN u}, \ref{ELS PINN ku} by PINN.
+And the prices by PINN and OSM seem that they are symmetrically transformed by the axis of $S_1=S_2$. 
+Based on the results, the prices by PINN at $\tau = 0$ do not catch the payoff well.
+% OSM ELS PRICE
+\begin{figure}[H]
+\centering
+    \subfigure[ELS price at $\tau = 0$.]
+    {\includegraphics[width=0.3\linewidth]{Figure/osm_u_maturity_bae.png}}
+    \subfigure[ELS price at $\tau = T$.]
+    {\includegraphics[width=0.3\linewidth]{Figure/osm_u_zero_bae.png}}
+    \caption{ELS prices by OSM when barrier is not touched}  
+    \label{ELS OSM u}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[ELS price at $\tau = 0$.]
+    {\includegraphics[width=0.3\linewidth]{Figure/osm_ku_maturity_bae.png}}
+    \subfigure[ELS price at $\tau = T$.]
+    {\includegraphics[width=0.3\linewidth]{Figure/osm_ku_zero_bae.png}}
+    \caption{ELS prices by OSM when barrier is touched}  
+    \label{ELS OSM ku}
+\end{figure}
+
+% PINN ELS PRICE
+\begin{figure}[H]
+\centering
+    \subfigure[ELS price at $\tau = 0$.]{\includegraphics[scale=0.2]{Figure/PINN_u_maturity_bae.png}}
+    \subfigure[ELS price at $\tau = T$.]{\includegraphics[scale=0.2]{Figure/PINN_u_bae.png}}
+    \caption{ELS prices by PINN when barrier is not touched}  
+    \label{ELS PINN u}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[ELS price at $\tau = 0$.]{\includegraphics[scale=0.2]{Figure/PINN_ku_maturity_bae.png}}
+    \subfigure[ELS price at $\tau = T$.]{\includegraphics[scale=0.2]{Figure/PINN_ku_bae.png}}
+    \caption{ELS prices by PINN when barrier is touched}  
+    \label{ELS PINN ku}
+\end{figure}
+
+\subsubsection{Greeks}
+
+% OSM Greeks
+Figures \ref{fig:delta OSM}, \ref{fig:gamma OSM} and \ref{fig:theta and crossgamma OSM} are
+ the Greeks calculated by OSM, and Figures \ref{fig:delta PINN}, \ref{fig:gamma PINN}
+ and \ref{fig:theta and crossgamma PINN} are the Greeks calculated by PINN.
+The Greeks calculated by OSM appears smooth but unstable in some areas where the value of Greeks steeply changes. In the case of PINN, the Greeks by PINN appears similar to the Greeks by OSM. And they seem like that they are symmetrically transformed by the axis of $S_1=S_2$, where the phenomenon is similar to the that of the price by PINN. 
+
+\begin{figure}[H]
+\centering
+    \subfigure[Delta 1 by OSM]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_delta_1_bae.png}}
+    \subfigure[Delta 2 by OSM]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_delta_2_bae.png}}
+    \caption{Delta by OSM when barrier is not touched} 
+    \label{fig:delta OSM}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[Gamma 1 by OSM]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_gamma_1_bae.png}}
+    \subfigure[Gamma 2 by OSM]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_gamma_2_bae.png}}
+    \caption{Gamma by OSM when barrier is not touched} 
+    \label{fig:gamma OSM}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[Theta by OSM]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_theta_bae.png}}
+    \subfigure[Cross gamma]{\includegraphics[width=0.3\linewidth]{Figure/osm_u_crossgamma_bae.png}}
+    \caption{Theta and Cross gamma by OSM when barrier is not touched}  
+    \label{fig:theta and crossgamma OSM}
+\end{figure}
+
+% PINN Greeks
+\begin{figure}[H]
+\centering
+    \subfigure[Delta 1 by PINN]{\includegraphics[width=0.3\linewidth]{Figure/PINN_u_delta_1_bae.png}}
+    \subfigure[Delta 2 by PINN]{\includegraphics[width=0.3\linewidth]{Figure/PINN_u_delta_2_bae.png}}
+    \caption{Delta by PINN when barrier is not touched} 
+    \label{fig:delta PINN}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[Gamma 1 by PINN]{\includegraphics[width=0.3\linewidth]{Figure/PINN_u_gamma_1_bae.png}}
+    \subfigure[Gamma 2 by PINN]{\includegraphics[width=0.3\linewidth]{Figure/PINN_u_gamma_2_bae.png}}
+    \caption{Gamma by PINN when barrier is not touched}
+    \label{fig:gamma PINN}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \subfigure[Theta by PINN]{\includegraphics[width=0.3\linewidth]{Figure/PINN_u_theta_bae.png}}
+    \subfigure[Cross gamma by PINN]{\includegraphics[width=0.3\linewidth]
+       {Figure/PINN_u_crossgamma_bae.png}}
+    \caption{Theta and Cross gamma by PINN when barrier is not touched}  
+    \label{fig:theta and crossgamma PINN}
+\end{figure}
+
+
+\section{Conclusion}
+
+Deep learning has received a lot of attention due to its high performance.
+ We focus on the power of artificial neural networks as function approximations.
+  We have implemented neural networks to solve parametric BSEs under local volatility models.
+   We propose algorithms to improve the performance of BSE approximation.
+    Data random generation scheme is used for approximate performance. 
+The transfer learning in Section \ref{translearning} improves the training speed 
+and training convergence of the models.
+ As a result in Section \ref{sec:Mu_nu1}, the approximate performance of local volatility models 
+ was evaluated through closed-form solutions and Dupire's equation.
+  Prices and Greeks are approximated well in measurement by solutions.
+   It is verified by Dupire's equation that the parametric BSE is well approximated.
+    Pricing and hedging derivatives under the local volatility is important to practitioners.
+It is expected that this study can contribute to practitioners as an analysis tool of the local volatility model. 
+
+We have also implemented PINN to solve the two-dimensional BSE for pricing two-asset step-down ELS,
+ and compared with OSM.
+PINN has advantage of computing partial derivatives easily by automatic differentiation.
+ And PINN for two-dimensional BSE shows similar price to the prices by OSM,
+  and similar Greeks to the Greeks by OSM.
+   However, it's accuracy is less than OSM it requires larger computational cost than OSM.
+    To improve the accuracy in a reasonable time, hyper parameters such as an activation function
+     which fits the best for the two-dimensional BSE needs to be improved.
+And methods for reducing computational cost are also need to be improved.
+
+{\bf Acknowledgement}:
+Bae (NRF-2021R1A2C109338)
+have been partially supported by Basic Science Research Progream
+ through the National Research Foundation of Korea (NRF) funded by the Ministry
+of Education, Science and Technology.
+
+\begin{thebibliography}{99}
+
+\bibitem{Bai-2022}
+Y. Bai, T. Chaolu and S. Bilige, 
+{\it The application of improved physics-informed neural network (IPINN) method in finance},
+Nonlinear Dynamics Vol. {107} (2022), no.4, 3655 - 3667
+%https://doi.org/10.1007/s11071-021-07146-z
+
+% 15 Deep learning for high dimensional Kolmogorov PDE 
+\bibitem{berner2020numerically}
+J. Berner, M.  Dablander and P. Grohs, 
+{\it Numerically solving parametric families of high-dimensional Kolmogorov
+ partial differential equations via deep learning},
+Advances in Neural Information Processing Systems Vol.{33} (2020), 
+16615-16627
+
+% 1 BSM
+\bibitem{Black-Scholes-Merton}
+F. Black and M. Scholes,
+{\it The Pricing of Options and Corporate Liabilities},
+J. Political Economy Vol. {81} (1973), no.3, 637-54,
+%https://EconPapers.repec.org/RePEc:ucp:jpolec:v:81:y:1973:i:3:p:637-54
+
+\bibitem{carr2009} P. Carr and R. Lee, {\it Volatility derivatives}, 
+Annu. Rev. Financ. Econ., 
+Vol. 1:319-339 (Volume publication date 2009)
+https://doi.org/10.1146/annurev.financial.050808.114304
+
+\bibitem{coleman2001}T.F. Coleman, Y. Li and A. Verma,
+%THOMAS F. COLEMAN, YUYING LI, and ARUN VERMA,
+{\it Reconstructing the unknown local volatility function},
+Quantitative Analysis in Financial Markets, (2001), 192-215
+%https://doi.org/10.1142/9789812810663_0007
+
+% 2 COX & ROSS 1976
+\bibitem{cox1976valuation}
+J.C. Cox and S.A. Ross,
+{\it The valuation of options for alternative stochastic processes},
+J. financial economics Vol. {3} (1976), no.1-2, 145-166
+
+% 3 COX 1975 CEV model
+\bibitem{cox1975notes}
+J.C. Cox, %John,
+{\it Notes on option pricing I: Constant elasticity of variance diffusions},
+Unpublished note, Stanford University, Graduate School of Business (1975)
+
+% 6 Derman-Kani Implied tree : Riding on a Smile
+\bibitem{Derman-Kani-1994}
+E. Derman and I. Kani,
+{\it Riding on a smile}, Risk Vol. {7}, (1994), no.2, 32-39
+
+% 5 Dupire equation : Pricing with a Smile
+\bibitem{Dupire-1994}
+B. Dupire, % and The Black–scholes Model (see Black and Gives Options,
+{\it Pricing with a Smile},
+Risk Magazine (1994),
+18-20
+
+% 4
+\bibitem{emanuel1982further}
+D.C. Emanuel and J.D. MacBeth,
+{\it Further results on the constant elasticity of variance call option pricing model},
+J. Financial and Quantitative Analysis Vol. {17} (1982), no.4, 533-554
+
+\bibitem{gatheral2011} J. Gatheral, The Volatility Surface: A Practictioner's Guide,
+2011, John Wiley and Sons, Inc.
+
+% 7 Cybenko's theorem
+% 1989년 George Cybenko는 뉴런 수만 무한하다면 은닉층 하나로 어떠한 함수도 근사할 수 있다는 것을 밝혔는데, 이를 시벤코 정리(Cybenko's theorem)이라고 한다. 실제로도 많은 문제들이 하나의 은닉층에 뉴런 수만 충분하다면 모델링이 가능하다. 하지만, 심층 신경망(DNN)이 얕은 신경망보다 파라미터 효율성이 훨씬 좋으며 복잡한 함수를 모델링하는 데에 있어 얕은 신경망보다 훨씬 적은 수의 뉴런을 사용하기 때문에 학습 시간이 더 빠르다.
+\bibitem{cybenko1989approximation}
+G. Cybenko, %George,
+{\it Approximation by superpositions of a sigmoidal function},
+Mathematics of control, signals and systems Vol. {2} (1989), no.2,
+303-314
+
+% 14 Deep parametric PDE method for option pricing
+\bibitem{glau2022deep}
+K. Glau and L. Wunderlich, 
+{\it The deep parametric PDE method and applications to option pricing},
+Applied Mathematics and Computation Vol. {432} (2022), 
+127355
+
+\bibitem{jeong2010operator}
+D.-R. Jeong, I.-S. Wee and J.-S. Kim, 
+{\it An operator splitting method for pricing the ELS option},
+J. of the Korean Society for Industrial and Applied Mathematics Vol. {14} (2010), no.3 175-187
+
+\bibitem{kang2023}
+S. Kang, ELS pricing with Physics-Informed Neural Network,
+  Master Thesis, 2023, Ajou University.
+
+%\bibitem{KimELS}
+%J. Kim, {\it Two-asset step-down ELS pricing with operator splitting method},
+%(2022)
+
+% 18
+\bibitem{kim2014option}
+Y. Kim, H.-O. Bae and H.K. Koo,
+{\it Option pricing and Greeks via a moving least square meshfree method},
+Quantitative Finance Vol. {14} (2014), no.10, 1753-1764
+
+
+% 9 Artificial neural networks for solving ODE & PDE
+\bibitem{lagaris1998artificial}
+I.E. Lagaris, A. Likas and D.I. Fotiadis,
+{\it Artificial neural networks for solving ordinary and partial differential equations},
+IEEE transactions on neural networks Vol. {9} (1998) no.5,
+987-1000
+ 
+\bibitem{LARGUINHO2013}
+M. Larguinho, J.C. Dias and C.A. Braumann,
+{\it On the computation of option prices and Greeks under the CEV model},
+Quantitative Finance Vol. {13} (2013), no.6, 907-917.
+%http://dx.doi.org/10.1080/14697688.2013.765958
+
+% 8 Neural algorithm for solving PDE
+\bibitem{lee1990neural}
+H. Lee and I.S. Kang, 
+{\it Neural algorithm for solving differential equations},
+J. Computational Physics Vol. {91} (1990), no.1,
+110-131
+
+\bibitem{muhyun2022} M. Lee,
+Solving Black-Scholes PDE Associated with Local Volatility via Physics-Informed Neural Network,
+Master Thesis, 2022, Ajou University. 
+
+% 17 
+\bibitem{ART002537016}
+H. Lim and H.-O. Bae, 
+{\it Construction of the Implied Volatility Surface by Thin Plate Spline Function},
+Korean J. of Financial Engineering Vol. {18} (2019), no.4, 1-36,
+10.35527/kfedoi.2019.18.4.001
+
+% 10 Solution of nonlinear ODE by feed forward neural networks
+\bibitem{meade1994solution}
+A.J. Meade Jr and A.A. Fernandez,
+{\it Solution of nonlinear ordinary differential equations by feedforward neural networks},
+Mathematical and Computer Modelling Vol. {20} (1994), no.9,
+19-44
+
+
+% 13 Raissi 2019 PINN
+\bibitem{raissi2019physics}
+M. Raissi, P. Perdikariss and G.E. Karniadakis, 
+{\it Physics-informed neural networks: A deep learning framework for solving forward and inverse problems
+ involving nonlinear partial differential equations},
+J. Computational physics Vol. {378} (2019),
+686-707
+
+
+% 12 DGM : Deep learning algorithm for solving PDE
+\bibitem{sirignano2018dgm}
+J. Sirignano and K. Spiliopoulos,
+{\it DGM: A deep learning algorithm for solving partial differential equations},
+J. computational physics Vol. {375} (2018),
+1339-1364
+
+
+
+% 19
+\bibitem{Wang-2022}
+X. Wang, J. Li and J. Li,
+{\it A Deep Learning Based Numerical PDE Method for Option Pricing},
+Computational Economics (2022),
+https://doi.org/10.1007/s10614-022-10279-x
+
+% 16 
+\bibitem{ART002181552}
+K. Woo, H.-O. Bae and Y. Kim, 
+{\it Financial Derivatives Pricing under Stochastic Alpha Beta Rho(SABR) Model},
+Korean J. of Financial Engineering Vol. {15} (2016), no.4, 1-27
+10.35527/kfedoi.2016.15.4.001
+
+
+% 11 
+\bibitem{yentis1996vlsi}
+R. Yentis and M.E. Zaghloul,
+{\it VLSI implementation of locally connected neural network for solving partial differential equations},
+IEEE Transactions on Circuits and Systems I: Fundamental Theory and Applications Vol. {43} (1996), no.8,
+687-690
+
+%\bibitem{Kritzman-1991}
+%Kritzman, Mark,
+%{\it What Practitioners Need to Know… About Estimating Volatility Part 1},
+%Financial Analysts Journal Vol. {47} (1991), no.4, 22-25
+
+%\bibitem{wilmott2006}
+%P. Wilmott, On Quantitative Finance, John Wiley \& Sons,Ltd., 2006.
+
+\end{thebibliography}
+\end{document}
+
