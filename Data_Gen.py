@@ -36,7 +36,7 @@ def generate_data_boundary(T, L, N, x_or_y, u_or_l):
         if u_or_l == 'l':
             x_b = torch.zeros((N, 1), dtype=torch.float32, device=device)
         elif u_or_l == 'u':
-            x_b = torch.zeros((N, 1), dtype=torch.float32, device=device)  ### +L을 더해야하는 것?
+            x_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + L  ### +L을 더해야하는 것?
         else:
             raise ValueError
     elif x_or_y == "y":
@@ -44,7 +44,7 @@ def generate_data_boundary(T, L, N, x_or_y, u_or_l):
         if u_or_l == 'l':
             y_b = torch.zeros((N, 1), dtype=torch.float32, device=device)
         elif u_or_l == 'u':
-            y_b = torch.zeros((N, 1), dtype=torch.float32, device=device)  ### +L을 더해야하는 것?
+            y_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + L  ### +L을 더해야하는 것?
         else:
             raise ValueError
     else:
@@ -59,7 +59,7 @@ def generate_data_ac(t_step, N, L, strike):
     x_ac = torch.rand([N, 1], dtype=torch.float32, device=device)
     x_ac = (L - strike) * x_ac + strike
     y_ac = torch.rand([N, 1], dtype=torch.float32, device=device)  ############# 무슨 조건인가요?
-    y_ac = (L - strike) * x_ac + strike  #################?이상합니다.
+    y_ac = (L - strike) * y_ac + strike  #################?이상합니다.
     ac = torch.cat([t_ac, x_ac, y_ac], 1).requires_grad_(True)
     return ac
 
@@ -158,8 +158,6 @@ def generate_sol(Ns, ic, coupon, kib, Strike):
 
 # Random Spatial numbers Loader
 def generate_data_bspde_gbm_put_3param_ELS(T, L, r, Ns, kib, coupon, step, Strike):
-
-
     N_coll, N_ic, N_ac, N_b = Ns
     N_sam = N_coll + N_ic + np.sum(N_ac) + np.sum(N_b)
     N_ac_4 = N_ac[4]

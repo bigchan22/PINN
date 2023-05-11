@@ -58,10 +58,10 @@ LV_y = sig_nvda
 d_x = 0.
 d_y = 0.
 
-N_coll = 1000  # 0 #100000 #10000 # Number of collocation points
-N_ic = 100  # 500  #초기값 점들 수
-N_ac = [100, 100, 100, 100, 100]  # N_ac_4,3,2,1,0
-N_b = [100, 100, 100, 100]  # lb_x,lb_y,ub_x,ub_y
+N_coll = 10000  # 0 #100000 #10000 # Number of collocation points
+N_ic = 500  # 500  #초기값 점들 수
+N_ac = [200, 200, 200, 200, 200]  # N_ac_4,3,2,1,0
+N_b = [200, 200, 200, 200]  # lb_x,lb_y,ub_x,ub_y
 
 Ns = (N_coll, N_ic, N_ac, N_b)
 N_sam = N_coll + N_ic + np.sum(N_ac) + np.sum(N_b)
@@ -202,7 +202,7 @@ print('u_yx : {}'.format(nn5_yx[:, 1]))
 
 start_time = time.time()
 
-epochs = 2  # 200
+epochs = 200  # 200
 
 
 for epoch in tqdm(range(epochs)):
@@ -357,8 +357,11 @@ for epoch in tqdm(range(epochs)):
         #         loss_lb_y_u = mse_cost_function(u_lb_y, lb_y_sol)
         loss_lb_x_u = mse_cost_function(u_lb_x_xx, lb_x_sol) + mse_cost_function(u_lb_x, lb_x_sol)
         loss_lb_y_u = mse_cost_function(u_lb_y_yy, lb_y_sol) + mse_cost_function(u_lb_y, lb_y_sol)
-        loss_ub_x_u = mse_cost_function(u_ub_x_xx, ub_x_sol)
-        loss_ub_y_u = mse_cost_function(u_ub_y_yy, ub_y_sol)
+        # loss_ub_x_u = mse_cost_function(u_ub_x_xx, ub_x_sol)
+        # loss_ub_y_u = mse_cost_function(u_ub_y_yy, ub_y_sol)
+
+        loss_ub_x_u = mse_cost_function(u_ub_x_x, ub_x_sol)
+        loss_ub_y_u = mse_cost_function(u_ub_y_y, ub_y_sol)
 
         #         loss_u_txy_ki = mse_cost_function(u_txy_ki, ku_txy_ki.clone().detach())
         loss_u_txy_ki = 0
@@ -375,8 +378,11 @@ for epoch in tqdm(range(epochs)):
         #         loss_lb_y_ku = mse_cost_function(ku_lb_y, lb_y_sol)
         loss_lb_x_ku = mse_cost_function(ku_lb_x_xx, lb_x_sol) + mse_cost_function(ku_lb_x, lb_x_sol)
         loss_lb_y_ku = mse_cost_function(ku_lb_y_yy, lb_y_sol) + mse_cost_function(ku_lb_y, lb_y_sol)
-        loss_ub_x_ku = mse_cost_function(ku_ub_x_xx, ub_x_sol)
-        loss_ub_y_ku = mse_cost_function(ku_ub_y_yy, ub_y_sol)
+        # loss_ub_x_ku = mse_cost_function(ku_ub_x_xx, ub_x_sol)
+        # loss_ub_y_ku = mse_cost_function(ku_ub_y_yy, ub_y_sol)
+
+        loss_ub_x_ku = mse_cost_function(ku_ub_x_x, ub_x_sol)
+        loss_ub_y_ku = mse_cost_function(ku_ub_y_y, ub_y_sol)
 
         loss_u = loss_pde_u + 1 * loss_ic_u \
                  + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u) \
