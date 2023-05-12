@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 
 import numpy as np
@@ -32,7 +32,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mat
 from pylab import cm
 from Data_Gen import generate_data_bspde_gbm_put_3param_ELS
-from Plot import plot_ELS,plot_loss
+from Plot import plot_ELS, plot_loss
+
 # T = 1097./365. # 2021-09-08 ~ 2024-09-09 : 1097 days / 3 years
 T = 1088. / 365.  # 2021-09-17 ~ 2024-09-09 : 1091 days / 3 years
 # div = 0.0128
@@ -59,9 +60,9 @@ d_x = 0.
 d_y = 0.
 
 N_coll = 10000  # 0 #100000 #10000 # Number of collocation points
-N_ic = 500  # 500  #초기값 점들 수
-N_ac = [200, 200, 200, 200, 200]  # N_ac_4,3,2,1,0
-N_b = [200, 200, 200, 200]  # lb_x,lb_y,ub_x,ub_y
+N_ic = 5000  # 500  #초기값 점들 수
+N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
+N_b = [1000, 1000, 1000, 1000]  # lb_x,lb_y,ub_x,ub_y
 
 Ns = (N_coll, N_ic, N_ac, N_b)
 N_sam = N_coll + N_ic + np.sum(N_ac) + np.sum(N_b)
@@ -135,7 +136,6 @@ def closure_ku_Adam():  # u는 knock in 했을 때의 가
     return loss_ku
 
 
-
 #             ,txy_kibx, txy_kiby, txy_stk5x, txy_stk5y
 
 
@@ -204,7 +204,6 @@ start_time = time.time()
 
 epochs = 200  # 200
 
-
 for epoch in tqdm(range(epochs)):
     if (loss_u <= 1e-5 and loss_ku <= 1e-5):
         break
@@ -234,6 +233,8 @@ for epoch in tqdm(range(epochs)):
                                    create_graph=True)[0][:, 2].reshape(-1, 1)
 
         u_ic = NN5(ic)
+        u_txy_ki = NN5(txy_ki)
+
         u_ac_4 = NN5(ac_4)
         u_ac_3 = NN5(ac_3)
         u_ac_2 = NN5(ac_2)
@@ -277,7 +278,7 @@ for epoch in tqdm(range(epochs)):
                                 retain_graph=True,
                                 create_graph=True)[0][:, 2].reshape(-1, 1)
 
-        u_txy_ki = NN5(txy_ki)
+
 
         ku = NN6(txy)
         ku_1 = torch.autograd.grad(inputs=txy, outputs=ku, grad_outputs=torch.ones_like(ku), retain_graph=True,
@@ -307,6 +308,9 @@ for epoch in tqdm(range(epochs)):
         ku_ub_x = NN6(ub_x)
         ku_ub_y = NN6(ub_y)
 
+        ku_txy_ki = NN6(txy_ki)
+        ku_txy_ki_cloned = ku_txy_ki.clone().detach()
+
         ku_lb_x_x = torch.autograd.grad(inputs=lb_x, outputs=ku_lb_x,
                                         grad_outputs=torch.ones_like(ku_lb_x), retain_graph=True, create_graph=True)[0][
                     :, 1].reshape(-1, 1)
@@ -335,7 +339,7 @@ for epoch in tqdm(range(epochs)):
                                          grad_outputs=torch.ones_like(ku_ub_y_y), retain_graph=True, create_graph=True)[
                          0][:, 2].reshape(-1, 1)
 
-        ku_txy_ki = NN6(txy_ki)
+
 
         pde_u = u_t - 0.5 * LV2_x * x ** 2 * u_xx - 0.5 * LV2_y * y ** 2 * u_yy \
                 - corr * LV_x * LV_y * x * y * u_xy \
@@ -347,7 +351,7 @@ for epoch in tqdm(range(epochs)):
 
         loss_pde_u = mse_cost_function(pde_u, pde_sol)
         loss_ic_u = mse_cost_function(u_ic, ic_sol)
-        loss_ac_4_u = mse_cost_function(u_ac_4, ac_4_sol) #    ac_4_sol = torch.ones((N_ac_4, 1), dtype=torch.float32) * (1. + coupon[4])
+        loss_ac_4_u = mse_cost_function(u_ac_4, ac_4_sol)
         loss_ac_3_u = mse_cost_function(u_ac_3, ac_3_sol)
         loss_ac_2_u = mse_cost_function(u_ac_2, ac_2_sol)
         loss_ac_1_u = mse_cost_function(u_ac_1, ac_1_sol)
@@ -363,8 +367,11 @@ for epoch in tqdm(range(epochs)):
         loss_ub_x_u = mse_cost_function(u_ub_x_x, ub_x_sol)
         loss_ub_y_u = mse_cost_function(u_ub_y_y, ub_y_sol)
 
-        #         loss_u_txy_ki = mse_cost_function(u_txy_ki, ku_txy_ki.clone().detach())
-        loss_u_txy_ki = 0
+
+        # print(ku_txy_ki_cloned.requires_grad)
+        loss_u_txy_ki = mse_cost_function(u_txy_ki, ku_txy_ki_cloned)
+        # loss_u_txy_ki = mse_cost_function(u_txy_ki, torch.zeros_like(u_txy_ki))
+        # loss_u_txy_ki = 0
 
         loss_pde_ku = mse_cost_function(pde_ku, pde_sol)
         loss_ic_ku = mse_cost_function(ku_ic, kic_sol)
@@ -387,7 +394,7 @@ for epoch in tqdm(range(epochs)):
         loss_u = loss_pde_u + 1 * loss_ic_u \
                  + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u) \
                  + 1 * (loss_ac_4_u + loss_ac_3_u + loss_ac_2_u + loss_ac_1_u + loss_ac_0_u) \
-                 + loss_u_txy_ki \
+                 + loss_u_txy_ki
 
         loss_ku = loss_pde_ku + 1 * loss_ic_ku \
                   + 1 * (loss_lb_x_ku + loss_lb_y_ku + loss_ub_x_ku + loss_ub_y_ku) \
@@ -464,6 +471,8 @@ print('loss_ku : {}\n' \
                                                     loss_ic_ku, loss_ac_4_ku, loss_ac_3_ku, loss_ac_2_ku, loss_ac_1_ku,
                                                     loss_ac_0_ku,
                                                     loss_lb_x_ku, loss_lb_y_ku, loss_ub_x_ku, loss_ub_y_ku))
-plot_loss(loss_history_u,"loss")
+plot_loss(loss_history_u, "loss")
 plot_ELS(step[5], L, 121, device, facevalue, NN5, "PINN_u_maturity")
-plot_ELS(T, L, 121, device, facevalue, NN6, "PINN_u_maturity")
+plot_ELS(T, L, 121, device, facevalue, NN6, "PINN_ku_maturity")
+plot_ELS(0, L, 121, device, facevalue, NN5, "PINN_u_maturity0")
+plot_ELS(0, L, 121, device, facevalue, NN6, "PINN_ku_maturity0")

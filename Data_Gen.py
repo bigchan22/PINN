@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 import torch.nn as nn
 
 import time
@@ -193,7 +193,9 @@ def generate_data_bspde_gbm_put_3param_ELS(T, L, r, Ns, kib, coupon, step, Strik
 
     txy_ki_x = txy[txy[:, 1] <= kib]  # x < kib 인 경우
     txy_ki_y = txy[txy[:, 2] <= kib]  # y < kib 인 경우
-    txy_ki = torch.cat([txy_ki_x, txy_ki_y], 0).requires_grad_(True)
+    txy_ki = torch.cat([txy_ki_x, txy_ki_y], 0)
+    # txy_ki = torch.cat([txy_ki_x, txy_ki_y], 0).requires_grad_(True)
+    txy_ki = txy_ki.clone().detach()
     #    txy_ki = torch.unique(txy_ki, axis=0)
     #    txy_ki = torch.unique(txy_ki)
 
