@@ -21,8 +21,8 @@ def generate_data_coll(L, T, N_coll):
     return coll
 
 
-def generate_data_initial(L, N):
-    t_ic = torch.zeros((N, 1), dtype=torch.float32, device=device)
+def generate_data_initial(L, N , t=0):
+    t_ic = torch.zeros((N, 1), dtype=torch.float32, device=device) + t
     x_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
     y_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
     ic = torch.cat([t_ic, x_ic, y_ic], 1).requires_grad_(True)
