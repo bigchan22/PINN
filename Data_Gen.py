@@ -8,41 +8,70 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib as mat
 from pylab import cm
+sig_spx = 0.286  # 자산1의 변동성
+sig_nvda = 0.547  # 자산2의 변동성
+LV2_x = sig_spx ** 2
+LV2_y = sig_nvda ** 2
+LV_x = sig_spx
+LV_y = sig_nvda
+# d_x = 0.0128
+# d_y = 0.0007
+d_x = 0.
+d_y = 0.
+r = 0.0045  # 무위험이자율
+corr = 0.5371  # 상관계수
+def generate_data_coll(L, T, N_coll, xbound=None, ybound=None, tbound=None):
+    if tbound is None:
+        t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * T
+    else:
+        t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (tbound[1] - tbound[0]) + tbound[0]
+    # t_coll = torch.tensor(t_coll, requires_grad=True, device=device)
 
+    if xbound is None:
+        x_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * L
+    else:
+        x_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (xbound[1] - xbound[0]) + xbound[0]
+    # x_coll = torch.tensor(x_coll, requires_grad=True, device=device)
 
-def generate_data_coll(L, T, N_coll):
-    t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * T
-    t_coll = torch.tensor(t_coll, requires_grad=True, device=device)
-    x_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * L
-    x_coll = torch.tensor(x_coll, requires_grad=True, device=device)
-    y_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * L
-    y_coll = torch.tensor(y_coll, requires_grad=True, device=device)
-    coll = torch.cat([t_coll, x_coll, y_coll], 1).requires_grad_(True)
+    if ybound is None:
+        y_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * L
+    else:
+        y_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (ybound[1] - ybound[0]) + ybound[0]
+    # y_coll = torch.tensor(y_coll, requires_grad=True, device=device)
+
+    # coll = torch.cat([t_coll, x_coll, y_coll], 1).requires_grad_(True)
+    coll = torch.cat([t_coll, x_coll, y_coll], 1)
     return coll
 
 
-def generate_data_initial(L, N , t=0):
-    t_ic = torch.zeros((N, 1), dtype=torch.float32, device=device) + t
-    x_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
-    y_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
+def generate_data_initial(L, N, xbound=None, ybound=None, tbound=None):
+    t_ic = torch.zeros((N, 1), dtype=torch.float32, device=device) + tbound[0]
+    if xbound is None:
+        x_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
+    else:
+        x_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * (xbound[1] - xbound[0]) + xbound[0]
+    if ybound is None:
+        y_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * L
+    else:
+        y_ic = torch.rand([N, 1], dtype=torch.float32, device=device) * (ybound[1] - ybound[0]) + ybound[0]
     ic = torch.cat([t_ic, x_ic, y_ic], 1).requires_grad_(True)
     return ic
 
 
-def generate_data_boundary(T, L, N, x_or_y, u_or_l):
-    t_b = torch.rand([N, 1], dtype=torch.float32, device=device) * T
+def generate_data_boundary(T, L, N, x_or_y, u_or_l, lower_bound=0, t_lower_bound=0):
+    t_b = torch.rand([N, 1], dtype=torch.float32, device=device) * (T - t_lower_bound) + t_lower_bound
     if x_or_y == "x":
-        y_b = torch.rand([N, 1], dtype=torch.float32, device=device) * L
+        y_b = torch.rand([N, 1], dtype=torch.float32, device=device) * (L - lower_bound) + lower_bound
         if u_or_l == 'l':
-            x_b = torch.zeros((N, 1), dtype=torch.float32, device=device)
+            x_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + lower_bound
         elif u_or_l == 'u':
             x_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + L  ### +L을 더해야하는 것?
         else:
             raise ValueError
     elif x_or_y == "y":
-        x_b = torch.rand([N, 1], dtype=torch.float32, device=device) * L
+        x_b = torch.rand([N, 1], dtype=torch.float32, device=device) * (L - lower_bound) + lower_bound
         if u_or_l == 'l':
-            y_b = torch.zeros((N, 1), dtype=torch.float32, device=device)
+            y_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + lower_bound
         elif u_or_l == 'u':
             y_b = torch.zeros((N, 1), dtype=torch.float32, device=device) + L  ### +L을 더해야하는 것?
         else:
@@ -62,6 +91,117 @@ def generate_data_ac(t_step, N, L, strike):
     y_ac = (L - strike) * y_ac + strike  #################?이상합니다.
     ac = torch.cat([t_ac, x_ac, y_ac], 1).requires_grad_(True)
     return ac
+
+
+def Payoff(xx, yy, kib, coupon, strike, ki=True):
+    if torch.min(xx, yy) < kib:
+        sol = torch.minimum(xx, yy)
+    elif torch.min(xx, yy) < (kib + 0.01):
+        if ki:
+            sol = torch.minimum(xx, yy)
+        else:
+            sol = (((1. + coupon) - kib) / 0.01) * (torch.minimum(xx, yy) - kib) + kib
+    elif torch.min(xx, yy) < strike:
+        if ki:
+            sol = torch.minimum(xx, yy)
+        else:
+            sol = (1. + coupon)
+    elif torch.min(xx, yy) < (strike + 0.01):
+        if ki:
+            sol = (((1. + coupon) - strike) / 0.01) * (torch.minimum(xx, yy) - strike) \
+                  + strike
+        else:
+            sol = (1. + coupon)
+
+    else:
+        sol = (1. + coupon)
+    return sol
+
+
+def ac_sol_nn(xx, yy, nn_output, kib, coupon):
+    # ku_txy_ki = NN6(txy_ki)
+    # ku_txy_ki_cloned = ku_txy_ki.clone().detach()
+    # txy = torch.cat([tt, xx, yy], 1)
+    # nn_output = nn(txy)
+    # nn_output = nn_output.clone().detach()
+    if torch.min(xx, yy) < kib:
+        sol = nn_output
+    elif torch.min(xx, yy) < (kib + 0.01):
+        sol = (((1. + coupon) - kib) / 0.01) * (nn_output - kib) + kib
+    else:
+        sol = (1. + coupon)
+    return sol
+
+
+def generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=None):
+    N_coll, N_ic, N_b = Ns
+    N_sam = N_coll + N_ic + np.sum(N_b)
+
+    N_lb_x = N_b[0]
+    N_lb_y = N_b[1]
+    N_ub_x = N_b[2]
+    N_ub_y = N_b[3]
+
+    coll = generate_data_coll(L, T, N_coll, xbound, ybound, tbound)
+
+    # ac = generate_data_ac(step, N_ac, L, strike)
+    ic = generate_data_initial(L, N_ic, xbound, ybound, tbound)
+    lb_x = generate_data_boundary(T, L, N_lb_x, 'x', 'l')
+    lb_y = generate_data_boundary(T, L, N_lb_y, 'y', 'l')
+    ub_x = generate_data_boundary(T, L, N_ub_x, 'x', 'u')
+    ub_y = generate_data_boundary(T, L, N_ub_y, 'y', 'u')
+
+    txy = torch.cat([coll,
+                     ic, lb_x, lb_y, ub_x, ub_y], 0).requires_grad_(True)
+    x = txy[:, 1].reshape((N_sam, 1)).requires_grad_(True)
+    y = txy[:, 2].reshape((N_sam, 1)).requires_grad_(True)
+
+    # x = txy[:, 1].reshape((N_sam, 1)).requires_grad_(True)
+    # y = txy[:, 2].reshape((N_sam, 1)).requires_grad_(True)
+
+    # txy_ki_x = txy[txy[:, 1] <= kib]  # x < kib 인 경우
+    # txy_ki_y = txy[txy[:, 2] <= kib]  # y < kib 인 경우
+    # txy_ki = torch.cat([txy_ki_x, txy_ki_y], 0)
+    # # txy_ki = torch.cat([txy_ki_x, txy_ki_y], 0).requires_grad_(True)
+    # txy_ki = txy_ki.clone().detach()
+    return txy, ic, lb_x, lb_y, ub_x, ub_y, x, y
+
+
+def generate_sol_step(Ns, ic, coupon, kib, strike, init=True, nn_pre=None, ki=True):
+    N_coll, N_ic, N_b = Ns
+    N_sam = N_coll + N_ic + np.sum(N_b)
+    N_lb_x = N_b[0]
+    N_lb_y = N_b[1]
+    N_ub_x = N_b[2]
+    N_ub_y = N_b[3]
+
+    pde_sol = torch.zeros((N_sam, 1), dtype=torch.float32).to(device)
+    ic_sol = torch.zeros((N_ic, 1), dtype=torch.float32).to(device)  # ic_sol, kic_sol initialized
+    if nn_pre is not None:
+        nn_output = nn_pre(ic)
+    for i, elem in enumerate(ic):
+        tt = elem[0]
+        xx = elem[1]
+        yy = elem[2]
+        if init:
+            ic_sol[i] = Payoff(xx, yy, kib, coupon, strike, ki)
+        else:
+            ic_sol[i] = ac_sol_nn(xx, yy, nn_output[i], strike, coupon)
+
+    lb_x_sol = torch.zeros((N_lb_x, 1), dtype=torch.float32).to(device)  # x = 0
+    lb_y_sol = torch.zeros((N_lb_y, 1), dtype=torch.float32).to(device)  # y = 0
+    ub_x_sol = torch.zeros((N_ub_x, 1), dtype=torch.float32).to(device)  # x = L
+    ub_y_sol = torch.zeros((N_ub_y, 1), dtype=torch.float32).to(device)  # y = L
+
+    # pde_sol = torch.tensor(pde_sol).reshape(N_sam, 1).to(device)
+    # ic_sol = torch.tensor(ic_sol).reshape(N_ic, 1).to(device)
+    #
+    # lb_x_sol = torch.tensor(lb_x_sol).reshape(N_lb_x, 1).to(device)
+    # lb_y_sol = torch.tensor(lb_y_sol).reshape(N_lb_y, 1).to(device)
+    # ub_x_sol = torch.tensor(ub_x_sol).reshape(N_ub_x, 1).to(device)
+    # ub_y_sol = torch.tensor(ub_y_sol).reshape(N_ub_y, 1).to(device)
+
+    return pde_sol, ic_sol, lb_x_sol, lb_y_sol, ub_x_sol, ub_y_sol
 
 
 def generate_sol(Ns, ic, coupon, kib, Strike):
@@ -207,3 +347,90 @@ def generate_data_bspde_gbm_put_3param_ELS(T, L, r, Ns, kib, coupon, step, Strik
            ac_4_sol, ac_3_sol, ac_2_sol, ac_1_sol, ac_0_sol, \
            lb_x_sol, lb_y_sol, ub_x_sol, ub_y_sol, pde_sol, txy_ki, \
         #             txy_zero
+
+
+def output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y):
+    u = nn(txy)
+    u_1 = torch.autograd.grad(inputs=txy, outputs=u, grad_outputs=torch.ones_like(u), retain_graph=True,
+                              create_graph=True)[0]
+    u_t = u_1[:, 0].reshape(-1, 1)
+    u_x = u_1[:, 1].reshape(-1, 1)
+    u_y = u_1[:, 2].reshape(-1, 1)
+    u_2 = torch.autograd.grad(inputs=txy, outputs=u_x, grad_outputs=torch.ones_like(u_x), retain_graph=True,
+                              create_graph=True)[0]
+    u_xx = u_2[:, 1].reshape(-1, 1)
+    u_xy = u_2[:, 2].reshape(-1, 1)
+    u_yy = torch.autograd.grad(inputs=txy, outputs=u_y, grad_outputs=torch.ones_like(u_y), retain_graph=True,
+                               create_graph=True)[0][:, 2].reshape(-1, 1)
+
+    u_ic = nn(ic)
+
+    u_lb_x = nn(lb_x)
+    u_lb_y = nn(lb_y)
+
+    u_ub_x = nn(ub_x)
+    u_ub_y = nn(ub_y)
+
+    u_lb_x_x = torch.autograd.grad(inputs=lb_x, outputs=u_lb_x, grad_outputs=torch.ones_like(u_lb_x),
+                                   retain_graph=True, create_graph=True)[0][:, 1].reshape(-1, 1)
+    u_lb_x_xx = \
+        torch.autograd.grad(inputs=lb_x, outputs=u_lb_x_x, grad_outputs=torch.ones_like(u_lb_x_x),
+                            retain_graph=True,
+                            create_graph=True)[0][:, 1].reshape(-1, 1)
+
+    u_lb_y_y = \
+        torch.autograd.grad(inputs=lb_y, outputs=u_lb_y, grad_outputs=torch.ones_like(u_lb_y), retain_graph=True,
+                            create_graph=True)[0][:, 2].reshape(-1, 1)
+    u_lb_y_yy = \
+        torch.autograd.grad(inputs=lb_y, outputs=u_lb_y_y, grad_outputs=torch.ones_like(u_lb_y_y),
+                            retain_graph=True,
+                            create_graph=True)[0][:, 2].reshape(-1, 1)
+
+    u_ub_x_x = \
+        torch.autograd.grad(inputs=ub_x, outputs=u_ub_x, grad_outputs=torch.ones_like(u_ub_x), retain_graph=True,
+                            create_graph=True)[0][:, 1].reshape(-1, 1)
+    u_ub_x_xx = \
+        torch.autograd.grad(inputs=ub_x, outputs=u_ub_x_x, grad_outputs=torch.ones_like(u_ub_x_x),
+                            retain_graph=True,
+                            create_graph=True)[0][:, 1].reshape(-1, 1)
+
+    u_ub_y_y = \
+        torch.autograd.grad(inputs=ub_y, outputs=u_ub_y, grad_outputs=torch.ones_like(u_ub_y), retain_graph=True,
+                            create_graph=True)[0][:, 2].reshape(-1, 1)
+    u_ub_y_yy = \
+        torch.autograd.grad(inputs=ub_y, outputs=u_ub_y_y, grad_outputs=torch.ones_like(u_ub_y_y),
+                            retain_graph=True,
+                            create_graph=True)[0][:, 2].reshape(-1, 1)
+    u1 = (u_t, u_x, u_y)
+    u2 = (u_xx, u_xy, u_yy)
+    ub = (u_lb_x, u_lb_y, u_ub_x, u_ub_y)
+    ub1 = (u_lb_x_x, u_lb_y_y, u_ub_x_x, u_ub_y_y)
+    ub2 = (u_lb_x_xx, u_lb_y_yy, u_ub_x_xx, u_ub_y_yy)
+    us = (u, u1, u2, u_ic, ub, ub1, ub2)
+    return us
+
+
+def Loss_PINN(us, Ns, ic, x, y, cost_f,coupon, kib, strike=None, init=True, nn_pre=None):
+    u, u1, u2, u_ic, ub, ub1, ub2 = us
+    u_t, u_x, u_y = u1
+    u_xx, u_xy, u_yy = u2
+    u_lb_x, u_lb_y, u_ub_x, u_ub_y = ub
+    u_lb_x_x, u_lb_y_y, u_ub_x_x, u_ub_y_y = ub1
+    u_lb_x_xx, u_lb_y_yy, u_ub_x_xx, u_ub_y_yy = ub2
+    pde_sol, ic_sol, lb_x_sol, lb_y_sol, ub_x_sol, ub_y_sol = \
+        generate_sol_step(Ns, ic, coupon, kib, strike, init=init, nn_pre=nn_pre)
+
+    pde_u = u_t - 0.5 * LV2_x * x ** 2 * u_xx - 0.5 * LV2_y * y ** 2 * u_yy \
+            - corr * LV_x * LV_y * x * y * u_xy \
+            - (r - d_x) * x * u_x - (r - d_y) * y * u_y + r * u
+
+    loss_pde_u = cost_f(pde_u, pde_sol)
+    loss_ic_u = cost_f(u_ic, ic_sol)
+
+    loss_lb_x_u = cost_f(u_lb_x, lb_x_sol)
+    loss_lb_y_u = cost_f(u_lb_y, lb_y_sol)
+    loss_ub_x_u = cost_f(u_ub_x_x, ub_x_sol)
+    loss_ub_y_u = cost_f(u_ub_y_y, ub_y_sol)
+    loss_u = loss_pde_u + 1 * loss_ic_u \
+             + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u)
+    return loss_u
