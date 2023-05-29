@@ -8,6 +8,7 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib as mat
 from pylab import cm
+
 sig_spx = 0.286  # 자산1의 변동성
 sig_nvda = 0.547  # 자산2의 변동성
 LV2_x = sig_spx ** 2
@@ -20,6 +21,8 @@ d_x = 0.
 d_y = 0.
 r = 0.0045  # 무위험이자율
 corr = 0.5371  # 상관계수
+
+
 def generate_data_coll(L, T, N_coll, xbound=None, ybound=None, tbound=None):
     if tbound is None:
         t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * T
@@ -93,43 +96,60 @@ def generate_data_ac(t_step, N, L, strike):
     return ac
 
 
-def Payoff(xx, yy, kib, coupon, strike, ki=True):
-    if torch.min(xx, yy) < kib:
-        sol = torch.minimum(xx, yy)
-    elif torch.min(xx, yy) < (kib + 0.01):
-        if ki:
-            sol = torch.minimum(xx, yy)
-        else:
-            sol = (((1. + coupon) - kib) / 0.01) * (torch.minimum(xx, yy) - kib) + kib
-    elif torch.min(xx, yy) < strike:
-        if ki:
-            sol = torch.minimum(xx, yy)
-        else:
-            sol = (1. + coupon)
-    elif torch.min(xx, yy) < (strike + 0.01):
-        if ki:
-            sol = (((1. + coupon) - strike) / 0.01) * (torch.minimum(xx, yy) - strike) \
-                  + strike
-        else:
-            sol = (1. + coupon)
-
-    else:
+def Payoff(xx, yy, kib, coupon):
+    grad_crit = 30.
+    # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
+    grad = (1. + coupon - torch.min(xx, yy)) / (kib - torch.min(xx, yy))
+    # eps = (1. + coupon - torch.min(xx, yy) / grad)
+    # eps = torch.clamp(eps, min=0.0).float()
+    # eps = np.float(eps)
+    if torch.min(xx, yy) >= kib:
         sol = (1. + coupon)
+    elif grad > grad_crit:
+        sol = (1. + coupon) - grad_crit * (kib - torch.min(xx, yy))
+    else:
+        sol = torch.min(xx, yy)
     return sol
 
 
-def ac_sol_nn(xx, yy, nn_output, kib, coupon):
+def ac_sol_nn(xx, yy, nn_output, barrier, coupon):
     # ku_txy_ki = NN6(txy_ki)
     # ku_txy_ki_cloned = ku_txy_ki.clone().detach()
     # txy = torch.cat([tt, xx, yy], 1)
     # nn_output = nn(txy)
     # nn_output = nn_output.clone().detach()
-    if torch.min(xx, yy) < kib:
-        sol = nn_output
-    elif torch.min(xx, yy) < (kib + 0.01):
-        sol = (((1. + coupon) - kib) / 0.01) * (nn_output - kib) + kib
-    else:
+    # if torch.min(xx, yy) < kib:
+    #     sol = nn_output
+    # elif torch.min(xx, yy) < (kib + 0.01):
+    #     sol = (((1. + coupon) - kib) / 0.01) * (nn_output - kib) + kib
+    # else:
+    #     sol = (1. + coupon)
+    # return sol
+    # grad = 5.
+    # # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
+    # eps = (1. + coupon - nn_output) / grad
+    # eps = torch.clamp(eps, min=0.0).float()
+    # # eps = np.float(eps)
+    # if torch.min(xx, yy) > barrier:
+    #     sol = (1. + coupon)
+    # elif torch.min(xx, yy) > (barrier - eps):
+    #     sol = (1. + coupon) - grad * (barrier - torch.min(xx, yy))
+    # else:
+    #     sol = nn_output
+    # return sol
+
+    grad_crit = 30.
+    # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
+    grad = (1. + coupon - nn_output) / (barrier - torch.min(xx, yy))
+    # eps = (1. + coupon - torch.min(xx, yy) / grad)
+    # eps = torch.clamp(eps, min=0.0).float()
+    # eps = np.float(eps)
+    if torch.min(xx, yy) >= barrier:
         sol = (1. + coupon)
+    elif grad > grad_crit:
+        sol = (1. + coupon) - grad_crit * (barrier - torch.min(xx, yy))
+    else:
+        sol = nn_output
     return sol
 
 
@@ -167,7 +187,7 @@ def generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=None):
     return txy, ic, lb_x, lb_y, ub_x, ub_y, x, y
 
 
-def generate_sol_step(Ns, ic, coupon, kib, strike, init=True, nn_pre=None, ki=True):
+def generate_sol_step(Ns, ic, coupon, barrier, init=True, nn_pre=None, ki=True):
     N_coll, N_ic, N_b = Ns
     N_sam = N_coll + N_ic + np.sum(N_b)
     N_lb_x = N_b[0]
@@ -179,28 +199,19 @@ def generate_sol_step(Ns, ic, coupon, kib, strike, init=True, nn_pre=None, ki=Tr
     ic_sol = torch.zeros((N_ic, 1), dtype=torch.float32).to(device)  # ic_sol, kic_sol initialized
     if nn_pre is not None:
         nn_output = nn_pre(ic)
+        nn_output = nn_output.clone().detach()
     for i, elem in enumerate(ic):
-        tt = elem[0]
         xx = elem[1]
         yy = elem[2]
         if init:
-            ic_sol[i] = Payoff(xx, yy, kib, coupon, strike, ki)
+            ic_sol[i] = Payoff(xx, yy, barrier, coupon)
         else:
-            ic_sol[i] = ac_sol_nn(xx, yy, nn_output[i], strike, coupon)
+            ic_sol[i] = ac_sol_nn(xx, yy, nn_output[i], barrier, coupon)
 
     lb_x_sol = torch.zeros((N_lb_x, 1), dtype=torch.float32).to(device)  # x = 0
     lb_y_sol = torch.zeros((N_lb_y, 1), dtype=torch.float32).to(device)  # y = 0
     ub_x_sol = torch.zeros((N_ub_x, 1), dtype=torch.float32).to(device)  # x = L
     ub_y_sol = torch.zeros((N_ub_y, 1), dtype=torch.float32).to(device)  # y = L
-
-    # pde_sol = torch.tensor(pde_sol).reshape(N_sam, 1).to(device)
-    # ic_sol = torch.tensor(ic_sol).reshape(N_ic, 1).to(device)
-    #
-    # lb_x_sol = torch.tensor(lb_x_sol).reshape(N_lb_x, 1).to(device)
-    # lb_y_sol = torch.tensor(lb_y_sol).reshape(N_lb_y, 1).to(device)
-    # ub_x_sol = torch.tensor(ub_x_sol).reshape(N_ub_x, 1).to(device)
-    # ub_y_sol = torch.tensor(ub_y_sol).reshape(N_ub_y, 1).to(device)
-
     return pde_sol, ic_sol, lb_x_sol, lb_y_sol, ub_x_sol, ub_y_sol
 
 
@@ -410,7 +421,7 @@ def output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y):
     return us
 
 
-def Loss_PINN(us, Ns, ic, x, y, cost_f,coupon, kib, strike=None, init=True, nn_pre=None):
+def Loss_PINN(us, Ns, ic, x, y, cost_f, coupon, barrier, init=True, nn_pre=None):
     u, u1, u2, u_ic, ub, ub1, ub2 = us
     u_t, u_x, u_y = u1
     u_xx, u_xy, u_yy = u2
@@ -418,7 +429,7 @@ def Loss_PINN(us, Ns, ic, x, y, cost_f,coupon, kib, strike=None, init=True, nn_p
     u_lb_x_x, u_lb_y_y, u_ub_x_x, u_ub_y_y = ub1
     u_lb_x_xx, u_lb_y_yy, u_ub_x_xx, u_ub_y_yy = ub2
     pde_sol, ic_sol, lb_x_sol, lb_y_sol, ub_x_sol, ub_y_sol = \
-        generate_sol_step(Ns, ic, coupon, kib, strike, init=init, nn_pre=nn_pre)
+        generate_sol_step(Ns, ic, coupon, barrier, init=init, nn_pre=nn_pre)
 
     pde_u = u_t - 0.5 * LV2_x * x ** 2 * u_xx - 0.5 * LV2_y * y ** 2 * u_yy \
             - corr * LV_x * LV_y * x * y * u_xy \

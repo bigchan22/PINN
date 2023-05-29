@@ -60,11 +60,11 @@ LV_y = sig_nvda
 d_x = 0.
 d_y = 0.
 
-N_coll = 100  # 0 #100000 #10000 # Number of collocation points
-N_ic = 50  # 500  #초기값 점들 수
+N_coll = 10000  # 0 #100000 #10000 # Number of collocation points
+N_ic = 1000  # 500  #초기값 점들 수
 # N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
 # N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
-N_b = [10, 10, 10, 10]  # lb_x,lb_y,ub_x,ub_y
+N_b = [500, 500, 500, 500]  # lb_x,lb_y,ub_x,ub_y
 
 Ns = (N_coll, N_ic, N_b)
 N_sam = N_coll + N_ic + np.sum(N_b)
@@ -87,10 +87,6 @@ class PINN_BS_2D(nn.Module):
     def __init__(self):
         super(PINN_BS_2D, self).__init__()
         self.net = nn.Sequential(
-            #           nn.Linear(3, 256),            nn.Tanh(),
-            #          nn.Linear(256, 256),          nn.Tanh(),
-            #         nn.Linear(256, 256),          nn.Tanh(), #tanh는 초기값이 좋지않다 tau=-
-            #        nn.Linear(256, 1),    )
             nn.Linear(3, 32), nn.Softplus(),  # nn.ReLU(), #nn.Tanh(),ReLU는 현재값이 좋지 않다.tau=T
             nn.Linear(32, 32), nn.Softplus(),  # nn.ReLU(), #nn.Tanh(),
             nn.Linear(32, 32), nn.ReLU(),  # nn.Softplus(), #nn.ReLU(), # nn.Tanh(),
@@ -135,36 +131,37 @@ step_history_u = []
 
 start_time = time.time()
 
-epochs = 30  # 200
+epochs = 200  # 200
 i = 5
-while i >= 1:
+while i >= 0:
     nn = KNN[i]
     print(i)
     if i == 5:
         init = True
         nn_pre = None
+        barrier = kib
     else:
         init = False
+        barrier = Strike[i]
         nn_pre = KNN[i + 1]
+        nn_pre.eval()
     for epoch in tqdm(range(epochs)):
         if loss_u <= 1e-5:
             break
         _ = 0
 
-        if i==0 :
+        if i == 0:
             txy, ic, lb_x, lb_y, ub_x, ub_y, x, y = \
-                generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=(T, step[i]))
+                generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=(step[i], T))
         else:
             txy, ic, lb_x, lb_y, ub_x, ub_y, x, y = \
-                generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=(step[i - 1], step[i]))
+                generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=(step[i], step[i - 1]))
         while loss_u > 1e-5 and _ < 500:
             _ += 1
-            us \
-                = output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y)
+            us = output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y)
 
             # loss_u = Loss_PINN(u, u1, u2, u_ic, ub, ub1, ub2, x, y,coupon[5], kib, strike=Strike[i], init=init, nn_pre=nn_pre)
-            loss_u = Loss_PINN(us, Ns, ic, x, y, mse_cost_function, coupon[i], kib,
-                               strike=Strike[i], init=init, nn_pre=nn_pre)
+            loss_u = Loss_PINN(us, Ns, ic, x, y, mse_cost_function, coupon[i], barrier, init=init, nn_pre=nn_pre)
             # print(ku_txy_ki_cloned.requires_grad)
             closure_nn_Adam(optimizers[i], loss_u)
             optimizers[i].step()
@@ -175,19 +172,18 @@ while i >= 1:
                     print('step : {}, epoch : {}'.format(_, epoch))
                     print('loss_u : {}'.format(loss_u))
                     print('time : {}'.format(time.time() - start_time))
-                    # u_outcome = torch.tensor([T, 1.0, 1.0]).reshape((1, 3)).to(device)
-                    # print('u price : {}'.format(nn(u_outcome) * facevalue))
 
                 if _ % 1 == 0 and epoch % 1 == 0:
                     loss_history_u.append(loss_u.item())
                     time_history_u.append(time.time() - start_time)
         epoch_end = epoch
-    # plot_loss(loss_history_u, "loss")
     plot_ELS(step[i], L, 121, device, facevalue, nn, "PINN_u_maturity_init" + str(i))
     if i is not 0:
-        plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "PINN_u_maturity"+str(i))
+        plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "PINN_u_maturity" + str(i))
     else:
         plot_ELS(T, L, 121, device, facevalue, nn, "PINN_u_maturity" + str(i))
     # plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "PINN_ku_maturity")
 
     i = i - 1
+for idx, nn in enumerate(KNN):
+    torch.save(nn, f'./Model/KNN{idx}_0529.pth')

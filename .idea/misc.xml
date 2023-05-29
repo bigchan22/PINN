@@ -5,28 +5,16 @@
     <option name="openedFilesInfos">
       <list>
         <OpenedFileInfo>
-          <option name="caretOffset" value="36552" />
-          <option name="fileUrl" value="file://$PROJECT_DIR$/torchPINN20230330.py" />
-        </OpenedFileInfo>
-        <OpenedFileInfo>
-          <option name="caretOffset" value="0" />
-          <option name="fileUrl" value="file://$PROJECT_DIR$/torchPINN20230328_savePlot.py" />
-        </OpenedFileInfo>
-        <OpenedFileInfo>
-          <option name="caretOffset" value="1081" />
+          <option name="caretOffset" value="11" />
           <option name="fileUrl" value="file://$PROJECT_DIR$/Plot.py" />
         </OpenedFileInfo>
         <OpenedFileInfo>
-          <option name="caretOffset" value="6856" />
-          <option name="fileUrl" value="file://$PROJECT_DIR$/Data_Gen.py" />
-        </OpenedFileInfo>
-        <OpenedFileInfo>
-          <option name="caretOffset" value="20191" />
-          <option name="fileUrl" value="file://$PROJECT_DIR$/PINN.py" />
-        </OpenedFileInfo>
-        <OpenedFileInfo>
-          <option name="caretOffset" value="4796" />
+          <option name="caretOffset" value="6388" />
           <option name="fileUrl" value="file://$PROJECT_DIR$/PINN_new.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="7749" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/Data_Gen.py" />
         </OpenedFileInfo>
       </list>
     </option>
