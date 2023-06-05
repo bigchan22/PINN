@@ -23,6 +23,17 @@ r = 0.0045  # 무위험이자율
 corr = 0.5371  # 상관계수
 
 
+def generate_data_block(N_coll, xbound=None, ybound=None, tbound=None):
+    t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (tbound[1] - tbound[0]) + tbound[0]
+    x_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (xbound[1] - xbound[0]) + xbound[0]
+    y_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * (ybound[1] - ybound[0]) + ybound[0]
+    # y_coll = torch.tensor(y_coll, requires_grad=True, device=device)
+
+    # coll = torch.cat([t_coll, x_coll, y_coll], 1).requires_grad_(True)
+    coll = torch.cat([t_coll, x_coll, y_coll], 1)
+    return coll
+
+
 def generate_data_coll(L, T, N_coll, xbound=None, ybound=None, tbound=None):
     if tbound is None:
         t_coll = torch.rand([N_coll, 1], dtype=torch.float32, device=device) * T
@@ -97,12 +108,9 @@ def generate_data_ac(t_step, N, L, strike):
 
 
 def Payoff(xx, yy, kib, coupon):
-    grad_crit = 30.
-    # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
+    grad_crit = 25.
+    grad_crit = 0.85/0.45
     grad = (1. + coupon - torch.min(xx, yy)) / (kib - torch.min(xx, yy))
-    # eps = (1. + coupon - torch.min(xx, yy) / grad)
-    # eps = torch.clamp(eps, min=0.0).float()
-    # eps = np.float(eps)
     if torch.min(xx, yy) >= kib:
         sol = (1. + coupon)
     elif grad > grad_crit:
@@ -113,37 +121,9 @@ def Payoff(xx, yy, kib, coupon):
 
 
 def ac_sol_nn(xx, yy, nn_output, barrier, coupon):
-    # ku_txy_ki = NN6(txy_ki)
-    # ku_txy_ki_cloned = ku_txy_ki.clone().detach()
-    # txy = torch.cat([tt, xx, yy], 1)
-    # nn_output = nn(txy)
-    # nn_output = nn_output.clone().detach()
-    # if torch.min(xx, yy) < kib:
-    #     sol = nn_output
-    # elif torch.min(xx, yy) < (kib + 0.01):
-    #     sol = (((1. + coupon) - kib) / 0.01) * (nn_output - kib) + kib
-    # else:
-    #     sol = (1. + coupon)
-    # return sol
-    # grad = 5.
-    # # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
-    # eps = (1. + coupon - nn_output) / grad
-    # eps = torch.clamp(eps, min=0.0).float()
-    # # eps = np.float(eps)
-    # if torch.min(xx, yy) > barrier:
-    #     sol = (1. + coupon)
-    # elif torch.min(xx, yy) > (barrier - eps):
-    #     sol = (1. + coupon) - grad * (barrier - torch.min(xx, yy))
-    # else:
-    #     sol = nn_output
-    # return sol
-
-    grad_crit = 30.
-    # grad = (1.+coupon-nn_output)/(kib-torch.min(xx, yy))
+    grad_crit = 25.
+    grad_crit = 0.85 / 0.45
     grad = (1. + coupon - nn_output) / (barrier - torch.min(xx, yy))
-    # eps = (1. + coupon - torch.min(xx, yy) / grad)
-    # eps = torch.clamp(eps, min=0.0).float()
-    # eps = np.float(eps)
     if torch.min(xx, yy) >= barrier:
         sol = (1. + coupon)
     elif grad > grad_crit:
@@ -162,9 +142,15 @@ def generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=None):
     N_ub_x = N_b[2]
     N_ub_y = N_b[3]
 
-    coll = generate_data_coll(L, T, N_coll, xbound, ybound, tbound)
-
-    # ac = generate_data_ac(step, N_ac, L, strike)
+    # coll = generate_data_coll(L, T, N_coll, xbound, ybound, tbound)
+    # Testing shock data
+    coll = generate_data_coll(L, T, N_coll // 2, xbound, ybound, tbound)
+    shock1 = generate_data_block(N_coll // 8, (0.4, 0.47), (0, L), tbound)
+    shock2 = generate_data_block(N_coll // 8, (0, L), (0.4, 0.47), tbound)
+    shock3 = generate_data_block(N_coll // 8, (0, 0.45), (0, L), tbound)
+    shock4 = generate_data_block(N_coll // 8, (0, L), (0, 0.45), tbound)
+    coll = torch.cat([coll, shock1, shock2, shock3,shock4], 0).requires_grad_(True)
+    ###############################
     ic = generate_data_initial(L, N_ic, xbound, ybound, tbound)
     lb_x = generate_data_boundary(T, L, N_lb_x, 'x', 'l')
     lb_y = generate_data_boundary(T, L, N_lb_y, 'y', 'l')
@@ -376,6 +362,7 @@ def output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y):
 
     u_ic = nn(ic)
 
+
     u_lb_x = nn(lb_x)
     u_lb_y = nn(lb_y)
 
@@ -442,6 +429,6 @@ def Loss_PINN(us, Ns, ic, x, y, cost_f, coupon, barrier, init=True, nn_pre=None)
     loss_lb_y_u = cost_f(u_lb_y, lb_y_sol)
     loss_ub_x_u = cost_f(u_ub_x_x, ub_x_sol)
     loss_ub_y_u = cost_f(u_ub_y_y, ub_y_sol)
-    loss_u = loss_pde_u + 1 * loss_ic_u \
+    loss_u = 100 * loss_pde_u + 1 * loss_ic_u \
              + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u)
     return loss_u

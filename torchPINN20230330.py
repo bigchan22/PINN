@@ -549,11 +549,11 @@ for epoch in tqdm(range(epochs)):
                  + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u) \
                  + 1 * (loss_ac_4_u + loss_ac_3_u + loss_ac_2_u + loss_ac_1_u + loss_ac_0_u) \
                  + loss_u_txy_ki \
- \
+
         loss_ku = loss_pde_ku + 1 * loss_ic_ku \
                   + 1 * (loss_lb_x_ku + loss_lb_y_ku + loss_ub_x_ku + loss_ub_y_ku) \
                   + 1 * (loss_ac_4_ku + loss_ac_3_ku + loss_ac_2_ku + loss_ac_1_ku + loss_ac_0_ku) \
- \
+
         optimizer5.step(closure_u_Adam)
         optimizer6.step(closure_ku_Adam)
 
@@ -626,7 +626,7 @@ for epoch in tqdm(range(epochs)):
                 ax3.set_title('NO KI ELS t=0')
 
                 # 그림 저장하기
-                plt.savefig(time.strftime('Pictures/ELS/torch/NO_KI/ELS_price%Y-%m-%d-%H-%M-%S'), dpi=200)
+                plt.savefig(time.strftime('./ELS_price%Y-%m-%d-%H-%M-%S'), dpi=200)
                 plt.show(block=False)
                 plt.close()
 
@@ -699,7 +699,7 @@ for epoch in tqdm(range(epochs)):
                 ax0.set_title('KI ELS t=0')
                 ax1.set_title('KI ELS t=T')
 
-                plt.savefig(time.strftime('Pictures/ELS/torch/KI/ELS_price%Y-%m-%d-%H-%M-%S'), dpi=200)
+                plt.savefig(time.strftime('./ELS_price%Y-%m-%d-%H-%M-%S'), dpi=200)
                 plt.show(block=False)
                 plt.close()
 
@@ -801,7 +801,7 @@ plt.xlabel('Iteration')
 plt.ylabel('Loss')
 plt.yticks(torch.tensor([torch.log10(1e-2), torch.log10(1e-1), torch.log10(1e-0)]),
            labels=['$10^{-2}$', '$10^{-1}$', '$1$'])
-plt.savefig(time.strftime('Pictures/ELS/torch/Training_Loss_u%Y-%m-%d-%H-%M-%S'), dpi=200)
+plt.savefig(time.strftime('./Training_Loss_u%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # loss_ku
 x_len_ku = torch.arange(len(loss_history_ku))
@@ -812,7 +812,7 @@ plt.xlabel('Iteration')
 plt.ylabel('Loss')
 plt.yticks(torch.tensor([torch.log10(1e-2), torch.log10(1e-1), torch.log10(1e-0)]),
            labels=['$10^{-2}$', '$10^{-1}$', '$1$'])
-plt.savefig(time.strftime('Pictures/ELS/torch/Training_Loss_ku%Y-%m-%d-%H-%M-%S'), dpi=200)
+plt.savefig(time.strftime('./Training_Loss_ku%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u_ic
 with torch.autograd.no_grad():
@@ -845,7 +845,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('ELS Price')
     #     fig.savefig('PINN_u_maturity.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_maturity%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_maturity%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u
 with torch.autograd.no_grad():
@@ -878,7 +878,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('ELS Price')
     #     fig.savefig('PINN_u.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # ku_ic
 with torch.autograd.no_grad():
@@ -911,7 +911,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('ELS Price')
     #     fig.savefig('PINN_ku_maturity.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_ku_maturity%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_ku_maturity%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # ku
 with torch.autograd.no_grad():
@@ -944,7 +944,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('ELS Price')
     #     fig.savefig('PINN_ku.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/ELS_Price%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./ELS_Price%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 with torch.autograd.no_grad():
     u_outcome = torch.tensor([T, 1.0 / L * L * 1, 1.0 / L * L * 1]).reshape((1, 3))
@@ -1004,7 +1004,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Delta 1')
     #     fig.savefig('PINN_u_delta_1.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_delta_1%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_delta_1%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u delta_y
 with torch.autograd.no_grad():
@@ -1022,7 +1022,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Delta 2')
     #     fig.savefig('PINN_u_delta_2.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_delta_2_%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_delta_2_%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u gamma_x
 with torch.autograd.no_grad():
@@ -1040,7 +1040,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Gamma 1')
     #     fig.savefig('PINN_u_gamma_1.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_gamma_1_%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_gamma_1_%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u gamma_y
 with torch.autograd.no_grad():
@@ -1058,7 +1058,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Gamma 2')
     #     fig.savefig('PINN_u_gamma_2.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_gamma_2_%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_gamma_2_%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u crossgamma
 # u gamma_y
@@ -1077,7 +1077,7 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Cross gamma')
     #     fig.savefig('PINN_u_crossgamma.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_crossgamma%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_crossgamma%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 # u theta
 with torch.autograd.no_grad():
@@ -1095,4 +1095,4 @@ with torch.autograd.no_grad():
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_title('Theta')
     #     fig.savefig('PINN_u_theta.png')
-    plt.savefig(time.strftime('Pictures/ELS/torch/PINN_u_theta%Y-%m-%d-%H-%M-%S'), dpi=200)
+    plt.savefig(time.strftime('./PINN_u_theta%Y-%m-%d-%H-%M-%S'), dpi=200)

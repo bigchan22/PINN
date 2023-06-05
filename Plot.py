@@ -49,8 +49,9 @@ def plot_2d(XXX, YYY, NO_KI_ELS_mat, uname):
     ax.set_xticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
     ax.set_yticks(torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]))
     ax.set_yticklabels(['$0$', '$50$', '$100$', '$150$', '$200$', '$250$', '$300$'])
-    ax.set_title('ELS Price')
+    ax.set_title('ELS Price'+uname)
     #     fig.savefig('PINN_u_maturity.png')
+    print('./Figure/' + uname + time.strftime('%Y-%m-%d-%H-%M-%S'))
     plt.savefig('./Figure/' + uname + time.strftime('%Y-%m-%d-%H-%M-%S'), dpi=200)
 
 def plot_ELS(T, L, N, device, facevalue, NN, uname):

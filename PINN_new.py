@@ -60,11 +60,11 @@ LV_y = sig_nvda
 d_x = 0.
 d_y = 0.
 
-N_coll = 10000  # 0 #100000 #10000 # Number of collocation points
+N_coll = 20000  # 0 #100000 #10000 # Number of collocation points
 N_ic = 1000  # 500  #초기값 점들 수
 # N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
 # N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
-N_b = [500, 500, 500, 500]  # lb_x,lb_y,ub_x,ub_y
+N_b = [100, 100, 100, 100]  # lb_x,lb_y,ub_x,ub_y
 
 Ns = (N_coll, N_ic, N_b)
 N_sam = N_coll + N_ic + np.sum(N_b)
@@ -131,7 +131,7 @@ step_history_u = []
 
 start_time = time.time()
 
-epochs = 200  # 200
+epochs = 30  # 200
 i = 5
 while i >= 0:
     nn = KNN[i]
@@ -156,6 +156,7 @@ while i >= 0:
         else:
             txy, ic, lb_x, lb_y, ub_x, ub_y, x, y = \
                 generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=(step[i], step[i - 1]))
+
         while loss_u > 1e-5 and _ < 500:
             _ += 1
             us = output_PINN(nn, txy, ic, lb_x, lb_y, ub_x, ub_y)
@@ -177,11 +178,12 @@ while i >= 0:
                     loss_history_u.append(loss_u.item())
                     time_history_u.append(time.time() - start_time)
         epoch_end = epoch
-    plot_ELS(step[i], L, 121, device, facevalue, nn, "PINN_u_maturity_init" + str(i))
+    plot_ELS(step[i], L, 121, device, facevalue, nn, "KU_term_step" + str(i))
+    # plot_ELS(T, L, 121, device, facevalue, nn, "KU_maturity" + str(i))
     if i is not 0:
-        plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "PINN_u_maturity" + str(i))
+        plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "KU_present_step" + str(i-1))
     else:
-        plot_ELS(T, L, 121, device, facevalue, nn, "PINN_u_maturity" + str(i))
+        plot_ELS(T, L, 121, device, facevalue, nn, "KU_present_step_final")
     # plot_ELS(step[i - 1], L, 121, device, facevalue, nn, "PINN_ku_maturity")
 
     i = i - 1
