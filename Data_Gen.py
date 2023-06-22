@@ -108,8 +108,8 @@ def generate_data_ac(t_step, N, L, strike):
 
 
 def Payoff(xx, yy, kib, coupon):
-    grad_crit = 25.
-    grad_crit = 0.85/0.45
+    grad_crit = 2500.
+    # grad_crit = 0.85/0.45
     grad = (1. + coupon - torch.min(xx, yy)) / (kib - torch.min(xx, yy))
     if torch.min(xx, yy) >= kib:
         sol = (1. + coupon)
@@ -118,11 +118,35 @@ def Payoff(xx, yy, kib, coupon):
     else:
         sol = torch.min(xx, yy)
     return sol
+def Payoff_x(xx, yy, kib, coupon):
+    grad_crit = 2500.
+    # grad_crit = 0.85/0.05
+    grad = (1. + coupon - torch.min(xx, yy)) / (kib - torch.min(xx, yy))
+    if torch.min(xx, yy) >= kib:
+        sol = 0.
+    elif grad > grad_crit:
+        sol = grad_crit
+    else:
+        sol = 1.
+    return sol
+# def Payoff_xx(xx, yy, kib, coupon):
+#     grad_crit = 25.
+#     # grad_crit = 0.85/0.05
+#     grad = (1. + coupon - torch.min(xx, yy)) / (kib - torch.min(xx, yy))
+#     if torch.min(xx, yy) >= kib:
+#         sol = 0.
+#     elif grad > grad_crit:
+#         sol = (1. + coupon) - grad_crit * (kib - torch.min(xx, yy))
+#     else:
+#         sol = 0.
+#     return sol
+
+
 
 
 def ac_sol_nn(xx, yy, nn_output, barrier, coupon):
     grad_crit = 25.
-    grad_crit = 0.85 / 0.45
+    # grad_crit = 0.85 / 0.05
     grad = (1. + coupon - nn_output) / (barrier - torch.min(xx, yy))
     if torch.min(xx, yy) >= barrier:
         sol = (1. + coupon)
@@ -151,7 +175,12 @@ def generate_data_step(T, L, Ns, xbound=None, ybound=None, tbound=None):
     shock4 = generate_data_block(N_coll // 8, (0, L), (0, 0.45), tbound)
     coll = torch.cat([coll, shock1, shock2, shock3,shock4], 0).requires_grad_(True)
     ###############################
-    ic = generate_data_initial(L, N_ic, xbound, ybound, tbound)
+    ic = generate_data_initial(L, N_ic//2, xbound, ybound, tbound)
+    icshock1 = generate_data_initial(L,N_ic // 4, (0.4, 0.47), (0, L), tbound)
+    icshock2 = generate_data_initial(L,N_ic // 4, (0, L), (0.4, 0.47), tbound)
+    ic = torch.cat([ic, icshock1, icshock2], 0).requires_grad_(True)
+
+
     lb_x = generate_data_boundary(T, L, N_lb_x, 'x', 'l')
     lb_y = generate_data_boundary(T, L, N_lb_y, 'y', 'l')
     ub_x = generate_data_boundary(T, L, N_ub_x, 'x', 'u')
@@ -183,6 +212,7 @@ def generate_sol_step(Ns, ic, coupon, barrier, init=True, nn_pre=None, ki=True):
 
     pde_sol = torch.zeros((N_sam, 1), dtype=torch.float32).to(device)
     ic_sol = torch.zeros((N_ic, 1), dtype=torch.float32).to(device)  # ic_sol, kic_sol initialized
+    ic_sol_x = torch.zeros((N_ic, 1), dtype=torch.float32).to(device)  # ic_sol, kic_sol initialized
     if nn_pre is not None:
         nn_output = nn_pre(ic)
         nn_output = nn_output.clone().detach()
@@ -191,6 +221,7 @@ def generate_sol_step(Ns, ic, coupon, barrier, init=True, nn_pre=None, ki=True):
         yy = elem[2]
         if init:
             ic_sol[i] = Payoff(xx, yy, barrier, coupon)
+            # ic_sol_x[i] = Payoff_x(xx, yy, barrier, coupon)
         else:
             ic_sol[i] = ac_sol_nn(xx, yy, nn_output[i], barrier, coupon)
 
@@ -429,6 +460,6 @@ def Loss_PINN(us, Ns, ic, x, y, cost_f, coupon, barrier, init=True, nn_pre=None)
     loss_lb_y_u = cost_f(u_lb_y, lb_y_sol)
     loss_ub_x_u = cost_f(u_ub_x_x, ub_x_sol)
     loss_ub_y_u = cost_f(u_ub_y_y, ub_y_sol)
-    loss_u = 100 * loss_pde_u + 1 * loss_ic_u \
-             + 1 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u)
+    loss_u = 1 * loss_pde_u + 10 * loss_ic_u \
+             + 10 * (loss_lb_x_u + loss_lb_y_u + loss_ub_x_u + loss_ub_y_u)
     return loss_u

@@ -55,31 +55,15 @@ LV2_x = sig_spx ** 2
 LV2_y = sig_nvda ** 2
 LV_x = sig_spx
 LV_y = sig_nvda
-# d_x = 0.0128
-# d_y = 0.0007
 d_x = 0.
 d_y = 0.
 
-N_coll = 20000  # 0 #100000 #10000 # Number of collocation points
-N_ic = 10000  # 500  #초기값 점들 수
-# N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
-# N_ac = [1000, 1000, 1000, 1000, 1000]  # N_ac_4,3,2,1,0
+N_coll = 2000  # 0 #100000 #10000 # Number of collocation points
+N_ic = 1000  # 500  #초기값 점들 수
 N_b = [100, 100, 100, 100]  # lb_x,lb_y,ub_x,ub_y
 
 Ns = (N_coll, N_ic, N_b)
 N_sam = N_coll + N_ic + np.sum(N_b)
-
-"""
-When forming the network, we have to keep in mind the number of inputs and outputs
-In our case: #inputs = 3 (t, x,y)
-         and #outputs = 1
-
-You can add ass many hidden layers as you want with as many neurons.
-More complex the network, the more prepared it is to find complex solutions, but it also requires more data.
-
-Let us create this network:
-min 5 hidden layer with 5 neurons each.
-"""
 
 
 # PINN net 정의
@@ -87,10 +71,10 @@ class PINN_BS_2D(nn.Module):
     def __init__(self):
         super(PINN_BS_2D, self).__init__()
         self.net = nn.Sequential(
-            nn.Linear(3, 32), nn.Softplus(),  # nn.ReLU(), #nn.Tanh(),ReLU는 현재값이 좋지 않다.tau=T
-            nn.Linear(32, 32), nn.Softplus(),  # nn.ReLU(), #nn.Tanh(),
+            nn.Linear(3, 32), nn.ReLU(),  # nn.ReLU(), #nn.Tanh(),ReLU는 현재값이 좋지 않다.tau=T
+            nn.Linear(32, 32), nn.ReLU(),  # nn.ReLU(), #nn.Tanh(),
             nn.Linear(32, 32), nn.ReLU(),  # nn.Softplus(), #nn.ReLU(), # nn.Tanh(),
-            nn.Linear(32, 32), nn.Softplus(),  # nn.ReLU(), # nn.Tanh(),
+            # nn.Linear(32, 32), nn.Softplus(),  # nn.ReLU(), # nn.Tanh(),
             nn.Linear(32, 1))
 
         for m in self.net.modules():
@@ -131,9 +115,9 @@ step_history_u = []
 
 start_time = time.time()
 
-epochs = 30  # 200
+epochs = 150  # 200
 i = 5
-while i >= 0:
+while i >= 5:
     nn = KNN[i]
     print(i)
     if i == 5:
@@ -188,4 +172,4 @@ while i >= 0:
 
     i = i - 1
 for idx, nn in enumerate(KNN):
-    torch.save(nn, f'./Model/KNN{idx}_0529.pth')
+    torch.save(nn, f'./Model/KNN{idx}_0614.pth')
